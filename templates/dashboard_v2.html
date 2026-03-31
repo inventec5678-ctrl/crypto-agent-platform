@@ -613,34 +613,7 @@ function formatTime(date) {
     return date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-function renderMarketSentiment(ind) {
-    if (!ind) return;
-    var price = ind.price;
-    setChip('sc-rsi', ind.rsi ? ind.rsi.toFixed(1) : '—', ind.rsi < 30 ? 'bull' : ind.rsi > 70 ? 'bear' : 'neutral');
-    setChip('sc-rsi4h', ind.rsi_4h ? ind.rsi_4h.toFixed(1) : '—', ind.rsi_4h < 30 ? 'bull' : ind.rsi_4h > 70 ? 'bear' : 'neutral');
-    setChip('sc-ma20', ind.ma20 ? fmtPrice(ind.ma20) : '—', price > ind.ma20 ? 'bull' : 'bear');
-    setChip('sc-ma50', ind.ma50 ? fmtPrice(ind.ma50) : '—', price > ind.ma50 ? 'bull' : 'bear');
-    setChip('sc-ma200', ind.ma200 ? fmtPrice(ind.ma200) : '—', price > ind.ma200 ? 'bull' : 'bear');
-    var regimeEl = document.getElementById('sc-regime');
-    var regimeDot = document.getElementById('sc-regime-dot');
-    var regimeVal = document.getElementById('sc-regime-val');
-    if (ind.regime_bull) { regimeEl.className = 'sentiment-chip bull'; regimeDot.className = 'regime-dot bull'; regimeVal.textContent = '多頭'; }
-    else if (ind.regime_bear) { regimeEl.className = 'sentiment-chip bear'; regimeDot.className = 'regime-dot bear'; regimeVal.textContent = '空頭'; }
-    else { regimeEl.className = 'sentiment-chip neutral'; regimeDot.className = 'regime-dot'; regimeVal.textContent = '中立'; }
-    setChip('sc-momentum', ind.momentum_7d !== undefined ? fmtPct(ind.momentum_7d) : '—', ind.momentum_7d > 0 ? 'bull' : ind.momentum_7d < 0 ? 'bear' : 'neutral');
-    var crossVal = '無';
-    if (ind.golden_cross) crossVal = '黃金交叉';
-    else if (ind.death_cross) crossVal = '死亡交叉';
-    setChip('sc-cross', crossVal, ind.golden_cross ? 'bull' : ind.death_cross ? 'bear' : 'neutral');
-}
 
-function setChip(id, val, type) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    el.className = 'sentiment-chip ' + type;
-    var v = document.getElementById(id + '-val');
-    if (v) v.textContent = val;
-}
 
 function setChip(id, val, type) {
     var el = document.getElementById(id);
@@ -754,6 +727,7 @@ function renderStrategyOverview(strategies) {
 var _rankStrategies = [];
 var _rankSortKey = 'win_rate';
 var _rankSortAsc = false;
+var _activePriceLines = {};
 
 function renderRankingTable(strategies) {
     console.log('[DEBUG] renderRankingTable called, strategies:', (strategies||[]).length);
@@ -889,6 +863,15 @@ function openStrategyModal(idx) {
             <div class="modal-section-title">止盈備註</div>\
             <div style="font-size:12px;color:var(--text-secondary);padding:8px;background:var(--bg-tertiary);border-radius:6px">' + s.tp_note + '</div>\
         </div>' : '') + '\
+        <div class="modal-section">\
+            <div class="modal-section-title">圖表疊加</div>\
+            <div class="modal-chart-btns">\
+                <button class="modal-chart-btn" onclick="togglePriceLine(\'entry\')">📍 進場線</button>\
+                <button class="modal-chart-btn" onclick="togglePriceLine(\'tp\')">🎯 止盈線</button>\
+                <button class="modal-chart-btn" onclick="togglePriceLine(\'sl\')">🛡 止損線</button>\
+                <button class="modal-chart-btn" onclick="clearPriceLines()">清除</button>\
+            </div>\
+        </div>\
     ';
 
     window._activeModalStrategy = s;
@@ -1114,7 +1097,7 @@ function loadChartData(sym, tf) {
 // ── Init ──
 
 function copyPrice(btn, val) {
-    if (!val || val === '—') return;
+    if (!val || val === '—' || val === 'null' || val === 'undefined') return;
     navigator.clipboard.writeText(val.toString()).then(function() {
         btn.classList.add('copied');
         var orig = btn.textContent;
@@ -1157,8 +1140,31 @@ document.addEventListener('DOMContentLoaded', function() {
     loadAnomalies();
 
     // Auto-refresh every 60s
-    setInterval(loadStrategies, 60000);
-    setInterval(loadAnomalies, 60000);
+    // Unified 60s refresh with countdown timer
+    var _refreshCountdown = 60;
+    var _countdownTimer = null;
+    function startCountdown() {
+        _refreshCountdown = 60;
+        clearInterval(_countdownTimer);
+        _countdownTimer = setInterval(function() {
+            _refreshCountdown--;
+            var badge = document.getElementById('update-badge');
+            if (badge) {
+                document.getElementById('update-time').textContent = '下次更新 ' + _refreshCountdown + 's';
+                badge.className = 'update-badge';
+            }
+            if (_refreshCountdown <= 0) {
+                loadStrategies();
+                loadAnomalies();
+                startCountdown();
+            }
+        }, 1000);
+    }
+    startCountdown();
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) { clearInterval(_countdownTimer); }
+        else { startCountdown(); }
+    });
 
     // TF buttons
     document.querySelectorAll('.tf-btn[data-tf]').forEach(function(btn) {
