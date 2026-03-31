@@ -50,45 +50,7 @@
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
         @keyframes slideIn { from { transform:translateX(20px); opacity:0; } to { transform:translateX(0); opacity:1; } }
         @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
-
-        /* ── Sidebar ── */
-        .sidebar {
-            width: 220px;
-            background: var(--bg-secondary);
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            position: fixed;
-            top: 0; left: 0;
-            height: 100vh;
-            z-index: 100;
-            transition: transform 0.3s ease;
-        }
-        .sidebar-logo {
-            padding: 20px var(--space-md);
-            border-bottom: 1px solid var(--border-color);
-            display: flex; align-items: center; gap: 10px;
-        }
-        .sidebar-logo-icon { font-size: 24px; }
-        .sidebar-logo-text { font-size: 15px; font-weight: 700; }
-        .sidebar-nav { flex: 1; padding: var(--space-sm) 0; overflow-y: auto; }
-        .nav-item {
-            display: flex; align-items: center; gap: 10px;
-            padding: 10px var(--space-md);
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all 0.15s;
-            font-size: 13px; font-weight: 500;
-            border-left: 3px solid transparent;
-        }
-        .nav-item:hover { color: var(--text-primary); background: rgba(255,255,255,0.04); }
-        .nav-item.active { color: var(--accent-blue); background: rgba(88,166,255,0.1); border-left-color: var(--accent-blue); }
-        .nav-item-icon { font-size: 16px; width: 20px; text-align: center; }
-        .nav-item-badge { margin-left: auto; background: var(--accent-red); color: white; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px; min-width: 18px; text-align: center; }
-        .sidebar-footer { padding: var(--space-md); border-top: 1px solid var(--border-color); font-size: 11px; color: var(--text-muted); }
-
-        /* ── Main ── */
-        .main-content { flex: 1; min-height: 100vh; }
+/* ── Main ── */
         .topbar {
             position: sticky; top: 0; z-index: 50;
             background: rgba(13,17,23,0.9);
@@ -411,9 +373,6 @@
 
         /* ── Responsive ── */
         @media (max-width: 768px) {
-            .sidebar { transform: translateX(-100%); }
-            .sidebar.open { transform: translateX(0); }
-            .main-content { margin-left: 0; }
             .topbar { padding: 10px 16px; }
             .page { padding: var(--space-md); }
         }
@@ -421,7 +380,6 @@
 </head>
 <body>
 
-<div class="app-layout">
     <!-- Sidebar -->
     
 
@@ -435,7 +393,7 @@
                     <span id="update-time">連接中...</span>
                 </div>
                 <div class="chart-tf" style="gap:2px;">
-                    <button class="tf-btn" onclick="toggleSidebar()">☰</button>
+                    <button class="tf-btn" >☰</button>
                 </div>
             </div>
         </div>
@@ -613,12 +571,6 @@ function formatTime(date) {
     return date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-// ── Sidebar Toggle ──
-function toggleSidebar() {
-    var sb = document.getElementById('sidebar');
-    sb.classList.toggle('open');
-}
-
 function computeConsensus(strategies) {
     var matched = strategies.filter(function(s){ return s.match_pct > 0; });
     var fullMatched = strategies.filter(function(s){ return s.match_pct === 100; });
@@ -665,7 +617,39 @@ function computeConsensus(strategies) {
     };
 }
 
-// ── Strategy Cards ──
+function renderStrategyOverview(strategies) {
+    if (!strategies || !strategies.length) return;
+    window._consensusStrategies = strategies;
+    var tfs = ['ALL'];
+    strategies.forEach(function(s) { var tf = s.timeframe || 'UNKNOWN'; if (!tfs.includes(tf)) tfs.push(tf); });
+    var html = '';
+    tfs.forEach(function(tf) {
+        var filtered = tf === 'ALL' ? strategies : strategies.filter(function(s) { return s.timeframe === tf; });
+        var sc = computeConsensus(filtered);
+        var tfIcon = tf === '4H' ? '⏱' : tf === '1D' ? '📅' : tf === '1H' ? '⏰' : tf === 'ALL' ? '🌐' : '📊';
+        var tfLabel = tf === 'ALL' ? '🌐 總共識' : tf;
+        var wrColor = sc.wr >= 60 ? 'l' : sc.wr >= 40 ? 'n' : 's';
+        html += '<div class="cons-row">';
+        html += '<div class="cons-row-header">';
+        html += '<span class="cons-row-icon">' + tfIcon + '</span>';
+        html += '<span class="cons-row-label">' + tfLabel + '</span>';
+        html += '<span class="cons-row-bias ' + sc.bias + '">' + sc.biasIcon + ' ' + sc.biasLabel + '</span>';
+        html += '<div class="cons-pills" style="margin-left:auto">';
+        if (sc.short > 0) html += '<span class="cons-pill s">🔴' + sc.short + '</span>';
+        if (sc.long > 0) html += '<span class="cons-pill l">🟢' + sc.long + '</span>';
+        if (sc.neutral > 0) html += '<span class="cons-pill n">' + sc.neutral + '</span>';
+        html += '</div></div>';
+        html += '<div class="cons-row-body">';
+        html += '<div class="cons-stat"><div class="cons-stat-label">勝率</div><div class="cons-stat-value ' + wrColor + '">' + sc.wr + '%</div><div class="cons-wr-bar"><div class="cons-wr-fill ' + wrColor + '" style="width:' + sc.wr + '%"></div></div></div>';
+        html += '<div class="cons-stat"><div class="cons-stat-label">進場</div><div class="cons-stat-value ' + (sc.hasFullMatched ? 'c' : 'n') + '">' + (sc.hasFullMatched ? sc.entryZone : '—') + '</div><div class="cons-stat-sub">' + sc.entryRange + '</div></div>';
+        html += '<div class="cons-stat"><div class="cons-stat-label">止盈</div><div class="cons-stat-value" style="color:var(--accent-green)">' + (sc.hasFullMatched ? sc.tpZone : '—') + '</div><div class="cons-stat-sub">' + sc.tpRange + '</div></div>';
+        html += '<div class="cons-stat"><div class="cons-stat-label">止損</div><div class="cons-stat-value" style="color:var(--accent-red)">' + (sc.hasFullMatched ? sc.slZone : '—') + '</div><div class="cons-stat-sub">' + sc.slRange + '</div></div>';
+        html += '</div></div>';
+    });
+    var body = document.getElementById('consensus-body');
+    if (body) body.innerHTML = html;
+}
+
 // ── Strategy Ranking Table ──
 var _rankStrategies = [];
 var _rankSortKey = 'win_rate';
@@ -911,6 +895,7 @@ function loadStrategies() {
         .then(function(r) { console.log('[DEBUG] strategies response ok:', r.ok); return r.ok ? r.json() : Promise.reject(r.status); })
         .then(function(data) {
             console.log('[DEBUG] strategies data received, count:', (data.strategies||[]).length);
+            renderStrategyOverview(data.strategies || []);
             renderRankingTable(data.strategies || []);
 
             var btcPrice = data.btc_price;
