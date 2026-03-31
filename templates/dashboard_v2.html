@@ -371,6 +371,33 @@
         .loading::after { content: '...'; animation: blink 1s infinite; }
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
+        /* ── Market Sentiment ── */
+        .sentiment-bar { display: flex; gap: var(--space-sm); margin-bottom: var(--space-lg); flex-wrap: wrap; }
+        .sentiment-chip { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; transition: all 0.2s; }
+        .sentiment-chip .chip-label { color: var(--text-muted); font-weight: 500; }
+        .sentiment-chip .chip-val { font-family: var(--font-mono); }
+        .sentiment-chip.bull { border-color: rgba(63,185,80,0.4); background: rgba(63,185,80,0.08); }
+        .sentiment-chip.bull .chip-val { color: var(--accent-green); }
+        .sentiment-chip.bear { border-color: rgba(248,81,73,0.4); background: rgba(248,81,73,0.08); }
+        .sentiment-chip.bear .chip-val { color: var(--accent-red); }
+        .sentiment-chip.neutral { border-color: var(--border-color); }
+        .sentiment-chip.neutral .chip-val { color: var(--text-primary); }
+        .sentiment-chip .regime-dot { width: 7px; height: 7px; border-radius: 50%; }
+        .sentiment-chip .regime-dot.bull { background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); }
+        .sentiment-chip .regime-dot.bear { background: var(--accent-red); box-shadow: 0 0 6px var(--accent-red); }
+        .rank-table tbody tr.row-long { background: rgba(63,185,80,0.04); }
+        .rank-table tbody tr.row-long:hover { background: rgba(63,185,80,0.10); }
+        .rank-table tbody tr.row-short { background: rgba(248,81,73,0.04); }
+        .rank-table tbody tr.row-short:hover { background: rgba(248,81,73,0.10); }
+        .modal-price-card { position: relative; }
+        .copy-btn { position: absolute; top: 6px; right: 6px; background: none; border: 1px solid var(--border-color); color: var(--text-muted); font-size: 9px; padding: 1px 5px; border-radius: 4px; cursor: pointer; transition: all 0.15s; font-family: var(--font-mono); }
+        .copy-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+        .copy-btn.copied { color: var(--accent-green); border-color: var(--accent-green); }
+        .modal-chart-btns { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+        .modal-chart-btn { font-size: 10px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.15s; }
+        .modal-chart-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+        .modal-chart-btn.active { background: rgba(88,166,255,0.15); color: var(--accent-blue); border-color: var(--accent-blue); }
+
         /* ── Responsive ── */
         @media (max-width: 768px) {
             .topbar { padding: 10px 16px; }
@@ -399,6 +426,21 @@
         </div>
 
         <div class="page">
+
+            <!-- Market Sentiment -->
+            <div class="section">
+                <div class="section-title">市場情緒</div>
+                <div class="sentiment-bar" id="sentiment-bar">
+                    <div class="sentiment-chip neutral" id="sc-rsi"><span class="chip-label">RSI 14</span><span class="chip-val" id="sc-rsi-val">—</span></div>
+                    <div class="sentiment-chip neutral" id="sc-rsi4h"><span class="chip-label">RSI 4H</span><span class="chip-val" id="sc-rsi4h-val">—</span></div>
+                    <div class="sentiment-chip neutral" id="sc-ma20"><span class="chip-label">MA20</span><span class="chip-val" id="sc-ma20-val">—</span></div>
+                    <div class="sentiment-chip neutral" id="sc-ma50"><span class="chip-label">MA50</span><span class="chip-val" id="sc-ma50-val">—</span></div>
+                    <div class="sentiment-chip neutral" id="sc-ma200"><span class="chip-label">MA200</span><span class="chip-val" id="sc-ma200-val">—</span></div>
+                    <div class="sentiment-chip neutral" id="sc-regime"><span class="regime-dot" id="sc-regime-dot"></span><span class="chip-label">市場結構</span><span class="chip-val" id="sc-regime-val">—</span></div>
+                    <div class="sentiment-chip neutral" id="sc-momentum"><span class="chip-label">7日動能</span><span class="chip-val" id="sc-momentum-val">—</span></div>
+                    <div class="sentiment-chip neutral" id="sc-cross"><span class="chip-label">交叉信號</span><span class="chip-val" id="sc-cross-val">—</span></div>
+                </div>
+            </div>
 
             <!-- Strategy Consensus -->
             <div class="section">
@@ -571,6 +613,64 @@ function formatTime(date) {
     return date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
+function renderMarketSentiment(ind) {
+    if (!ind) return;
+    var price = ind.price;
+    setChip('sc-rsi', ind.rsi ? ind.rsi.toFixed(1) : '—', ind.rsi < 30 ? 'bull' : ind.rsi > 70 ? 'bear' : 'neutral');
+    setChip('sc-rsi4h', ind.rsi_4h ? ind.rsi_4h.toFixed(1) : '—', ind.rsi_4h < 30 ? 'bull' : ind.rsi_4h > 70 ? 'bear' : 'neutral');
+    setChip('sc-ma20', ind.ma20 ? fmtPrice(ind.ma20) : '—', price > ind.ma20 ? 'bull' : 'bear');
+    setChip('sc-ma50', ind.ma50 ? fmtPrice(ind.ma50) : '—', price > ind.ma50 ? 'bull' : 'bear');
+    setChip('sc-ma200', ind.ma200 ? fmtPrice(ind.ma200) : '—', price > ind.ma200 ? 'bull' : 'bear');
+    var regimeEl = document.getElementById('sc-regime');
+    var regimeDot = document.getElementById('sc-regime-dot');
+    var regimeVal = document.getElementById('sc-regime-val');
+    if (ind.regime_bull) { regimeEl.className = 'sentiment-chip bull'; regimeDot.className = 'regime-dot bull'; regimeVal.textContent = '多頭'; }
+    else if (ind.regime_bear) { regimeEl.className = 'sentiment-chip bear'; regimeDot.className = 'regime-dot bear'; regimeVal.textContent = '空頭'; }
+    else { regimeEl.className = 'sentiment-chip neutral'; regimeDot.className = 'regime-dot'; regimeVal.textContent = '中立'; }
+    setChip('sc-momentum', ind.momentum_7d !== undefined ? fmtPct(ind.momentum_7d) : '—', ind.momentum_7d > 0 ? 'bull' : ind.momentum_7d < 0 ? 'bear' : 'neutral');
+    var crossVal = '無';
+    if (ind.golden_cross) crossVal = '黃金交叉';
+    else if (ind.death_cross) crossVal = '死亡交叉';
+    setChip('sc-cross', crossVal, ind.golden_cross ? 'bull' : ind.death_cross ? 'bear' : 'neutral');
+}
+
+function setChip(id, val, type) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.className = 'sentiment-chip ' + type;
+    var v = document.getElementById(id + '-val');
+    if (v) v.textContent = val;
+}
+
+function setChip(id, val, type) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.className = 'sentiment-chip ' + type;
+    var v = document.getElementById(id + '-val');
+    if (v) v.textContent = val;
+}
+
+function renderMarketSentiment(ind) {
+    if (!ind) return;
+    var price = ind.price;
+    setChip('sc-rsi', ind.rsi ? ind.rsi.toFixed(1) : '—', ind.rsi < 30 ? 'bull' : ind.rsi > 70 ? 'bear' : 'neutral');
+    setChip('sc-rsi4h', ind.rsi_4h ? ind.rsi_4h.toFixed(1) : '—', ind.rsi_4h < 30 ? 'bull' : ind.rsi_4h > 70 ? 'bear' : 'neutral');
+    setChip('sc-ma20', ind.ma20 ? fmtPrice(ind.ma20) : '—', price > ind.ma20 ? 'bull' : 'bear');
+    setChip('sc-ma50', ind.ma50 ? fmtPrice(ind.ma50) : '—', price > ind.ma50 ? 'bull' : 'bear');
+    setChip('sc-ma200', ind.ma200 ? fmtPrice(ind.ma200) : '—', price > ind.ma200 ? 'bull' : 'bear');
+    var regimeEl = document.getElementById('sc-regime');
+    var regimeDot = document.getElementById('sc-regime-dot');
+    var regimeVal = document.getElementById('sc-regime-val');
+    if (ind.regime_bull) { regimeEl.className = 'sentiment-chip bull'; regimeDot.className = 'regime-dot bull'; regimeVal.textContent = '多頭'; }
+    else if (ind.regime_bear) { regimeEl.className = 'sentiment-chip bear'; regimeDot.className = 'regime-dot bear'; regimeVal.textContent = '空頭'; }
+    else { regimeEl.className = 'sentiment-chip neutral'; regimeDot.className = 'regime-dot'; regimeVal.textContent = '中立'; }
+    setChip('sc-momentum', ind.momentum_7d !== undefined ? fmtPct(ind.momentum_7d) : '—', ind.momentum_7d > 0 ? 'bull' : ind.momentum_7d < 0 ? 'bear' : 'neutral');
+    var crossVal = '無';
+    if (ind.golden_cross) crossVal = '黃金交叉';
+    else if (ind.death_cross) crossVal = '死亡交叉';
+    setChip('sc-cross', crossVal, ind.golden_cross ? 'bull' : ind.death_cross ? 'bear' : 'neutral');
+}
+
 function computeConsensus(strategies) {
     var matched = strategies.filter(function(s){ return s.match_pct > 0; });
     var fullMatched = strategies.filter(function(s){ return s.match_pct === 100; });
@@ -708,8 +808,9 @@ function doRankSort() {
         var wrClass = wr >= 60 ? 'good' : wr >= 40 ? 'warn' : 'bad';
         var ddClass = dd <= 10 ? 'good' : dd <= 20 ? 'warn' : 'bad';
         var pfClass = pf >= 3 ? 'good' : pf >= 2 ? 'warn' : 'bad';
+        var rowClass = rankClass + ' ' + (dir === 'LONG' ? 'row-long' : dir === 'SHORT' ? 'row-short' : '');
 
-        html += '<tr class="' + rankClass + '" onclick="openStrategyModal(' + i + ')" title="點擊查看詳情">';
+        html += '<tr class="' + rowClass + '" onclick="openStrategyModal(' + i + ')" title="點擊查看詳情">';
         html += '<td class="rank-num">' + rank + '</td>';
         html += '<td><div class="rank-name-cell"><div class="rank-name">' + (s.name || '?') + '</div><div class="rank-tf">' + (s.timeframe || '') + '</div></div></td>';
         html += '<td>' + (s.timeframe || '—') + '</td>';
@@ -764,9 +865,9 @@ function openStrategyModal(idx) {
         <div class="modal-section">\
             <div class="modal-section-title">進場 / 止盈 / 止損</div>\
             <div class="modal-prices">\
-                <div class="modal-price-card"><div class="modal-price-label">進場價</div><div class="modal-price-value entry">' + fmtPrice(s.entry_price) + '</div></div>\
-                <div class="modal-price-card"><div class="modal-price-label">止盈</div><div class="modal-price-value tp">' + fmtPrice(s.take_profit) + '</div></div>\
-                <div class="modal-price-card"><div class="modal-price-label">止損</div><div class="modal-price-value sl">' + fmtPrice(s.stop_loss) + '</div></div>\
+                <div class="modal-price-card"><div class="modal-price-label">進場價</div><div class="modal-price-value entry">' + fmtPrice(s.entry_price) + '</div><button class="copy-btn" onclick="copyPrice(this, \'' + s.entry_price + '\')">複製</button></div>\
+                <div class="modal-price-card"><div class="modal-price-label">止盈</div><div class="modal-price-value tp">' + fmtPrice(s.take_profit) + '</div><button class="copy-btn" onclick="copyPrice(this, \'' + s.take_profit + '\')">複製</button></div>\
+                <div class="modal-price-card"><div class="modal-price-label">止損</div><div class="modal-price-value sl">' + fmtPrice(s.stop_loss) + '</div><button class="copy-btn" onclick="copyPrice(this, \'' + s.stop_loss + '\')">複製</button></div>\
             </div>\
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">\
                 <div class="modal-price-card"><div class="modal-price-label">TP%</div><div class="modal-price-value tp">' + (s.tp_pct ? s.tp_pct.toFixed(1) + '%' : '—') + '</div></div>\
@@ -790,12 +891,15 @@ function openStrategyModal(idx) {
         </div>' : '') + '\
     ';
 
+    window._activeModalStrategy = s;
+    clearPriceLines();
     document.getElementById('modal-title').textContent = s.name || '策略詳情';
     document.getElementById('strategy-modal').classList.add('open');
 }
 
 function closeStrategyModal() {
     document.getElementById('strategy-modal').classList.remove('open');
+    clearPriceLines();
 }
 
 // ── Anomaly Panels ──
@@ -896,12 +1000,15 @@ function loadStrategies() {
         .then(function(data) {
             console.log('[DEBUG] strategies data received, count:', (data.strategies||[]).length);
             renderStrategyOverview(data.strategies || []);
+            renderMarketSentiment(data.indicators || {});
             renderRankingTable(data.strategies || []);
 
             var btcPrice = data.btc_price;
             var ind = data.indicators || {};
             lastSuccessfulUpdate = new Date();
             updateBadge('', '更新於 ' + formatTime(lastSuccessfulUpdate));
+
+            renderMarketSentiment(ind);
 
             // Update chart price
             if (btcPrice) {
@@ -1005,6 +1112,44 @@ function loadChartData(sym, tf) {
 }
 
 // ── Init ──
+
+function copyPrice(btn, val) {
+    if (!val || val === '—') return;
+    navigator.clipboard.writeText(val.toString()).then(function() {
+        btn.classList.add('copied');
+        var orig = btn.textContent;
+        btn.textContent = '已複製';
+        setTimeout(function() { btn.classList.remove('copied'); btn.textContent = orig; }, 1500);
+    }).catch(function() {});
+}
+
+function togglePriceLine(type) {
+    if (!candleSeries) return;
+    var strat = window._activeModalStrategy;
+    if (!strat) return;
+    var price = type === 'entry' ? strat.entry_price : type === 'tp' ? strat.take_profit : strat.stop_loss;
+    if (!price) return;
+    var color = type === 'entry' ? '#39D0D8' : type === 'tp' ? '#3FB950' : '#F85149';
+    var label = type === 'entry' ? '進場' : type === 'tp' ? '止盈' : '止損';
+    if (_activePriceLines[type]) {
+        candleSeries.removePriceLine(_activePriceLines[type]);
+        _activePriceLines[type] = null;
+        document.querySelectorAll('.modal-chart-btn').forEach(function(b) { if (b.textContent.includes(label)) b.classList.remove('active'); });
+        return;
+    }
+    var line = candleSeries.createPriceLine({ price: price, color: color, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: label });
+    _activePriceLines[type] = line;
+    document.querySelectorAll('.modal-chart-btn').forEach(function(b) { if (b.textContent.includes(label)) b.classList.add('active'); });
+}
+
+function clearPriceLines() {
+    if (!candleSeries) return;
+    Object.keys(_activePriceLines).forEach(function(k) {
+        if (_activePriceLines[k]) { candleSeries.removePriceLine(_activePriceLines[k]); _activePriceLines[k] = null; }
+    });
+    document.querySelectorAll('.modal-chart-btn').forEach(function(b) { b.classList.remove('active'); });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     initChart();
     loadChartData('BTC', '4h');
