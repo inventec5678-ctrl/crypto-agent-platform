@@ -1,0 +1,28 @@
+{
+  "experiment_id": "ce7c2e856eee",
+  "commit_hash": "unknown",
+  "strategy_name": "RSIReversalStrategy",
+  "params": {
+    "period": 22,
+    "oversold": 17.5404,
+    "overbought": 72.5921
+  },
+  "metrics": {
+    "sharpe_ratio": -1.9653064651070493,
+    "max_drawdown_pct": 0.01192594845811982,
+    "win_rate": 0.0,
+    "total_return_pct": -0.01192594845811982,
+    "profit_factor": 0.0,
+    "total_trades": 1,
+    "volatility": -1.9653064651070493,
+    "sortino_ratio": -1.9653064651070493
+  },
+  "status": "discard",
+  "description": "❌ 放棄: 交易次數不足 (1)",
+  "timestamp": "2026-03-27T00:15:21.314146",
+  "duration_seconds": 97.89,
+  "backtest_period": {
+    "start": "2017-01-01",
+    "end": "2026-12-31"
+  }
+}

@@ -1,0 +1,370 @@
+[
+  {
+    "factor_id": "Regime_MA_Cross_v1",
+    "name": "Regime-Aware MA Cross",
+    "type": "trend",
+    "entry": {
+      "long": {
+        "golden_cross": true,
+        "rsi_above_55": true,
+        "momentum_7d_above_0.5pct": true,
+        "price_above_ma200": true,
+        "regime_bull": true
+      },
+      "short": {
+        "death_cross": true,
+        "rsi_below_45": true,
+        "momentum_7d_below_minus0.5pct": true,
+        "price_below_ma200": true,
+        "regime_bear": true
+      }
+    },
+    "stop_loss": "3%",
+    "take_profit": "5%",
+    "max_holding": "15 bars",
+    "source": "auto_research",
+    "status": "verified",
+    "metrics": {
+      "win_rate": 71.43,
+      "profit_factor": 2.66,
+      "max_drawdown": 3.69,
+      "sharpe": 3.13
+    },
+    "timeframe": "1D"
+  },
+  {
+    "factor_id": "Regime_MA_Cross_v2",
+    "name": "Regime-Aware MA Cross v2",
+    "type": "trend",
+    "entry": {
+      "long": {
+        "golden_cross": true,
+        "rsi_above_50": true,
+        "momentum_7d_above_0.5pct": true,
+        "price_above_ma200": true,
+        "regime_bull": true
+      },
+      "short": {
+        "death_cross": true,
+        "rsi_below_48": true,
+        "momentum_7d_below_minus0.5pct": true,
+        "price_below_ma200": true,
+        "regime_bear": true
+      }
+    },
+    "stop_loss": "3%",
+    "take_profit": "7%",
+    "max_holding": "15 bars",
+    "source": "auto_research",
+    "status": "verified",
+    "metrics": {
+      "win_rate": 73.33,
+      "profit_factor": 2.75,
+      "max_drawdown": 3.69,
+      "sharpe": 3.39
+    },
+    "timeframe": "1D"
+  },
+  {
+    "factor_id": "EMA_RSI_Optimized_4H",
+    "name": "EMA_RSI_Optimized_4H",
+    "type": "trend",
+    "timeframe": "4H",
+    "entry": {
+      "long": {
+        "EMA9_cross_above_EMA21": true,
+        "RSI_55_to_70": true
+      },
+      "short": {
+        "EMA9_cross_below_EMA21": true,
+        "RSI_below_45": true
+      }
+    },
+    "stop_loss": "2.0 ATR",
+    "take_profit": "1.5 ATR",
+    "source": "auto_research",
+    "status": "verified",
+    "metrics": {
+      "win_rate": 65.6,
+      "profit_factor": 2.3,
+      "max_drawdown": 10.35,
+      "sharpe": 4.22
+    }
+  },
+  {
+    "factor_id": "EMA_Crossover_1D",
+    "name": "EMA Crossover 1D",
+    "type": "trend",
+    "timeframe": "1D",
+    "entry": {
+      "long": {
+        "EMA8_cross_above_EMA40": true,
+        "RSI_above_50": true
+      },
+      "short": {
+        "EMA8_cross_below_EMA40": true,
+        "RSI_below_50": true
+      }
+    },
+    "stop_loss": "1.0 ATR",
+    "take_profit": "2.0 ATR",
+    "source": "auto_research",
+    "status": "verified",
+    "metrics": {
+      "win_rate": 64.38,
+      "profit_factor": 3.3,
+      "max_drawdown": 25.63,
+      "sharpe": 1.96
+    }
+  },
+  {
+    "factor_id": "SHORT_ONLY_DeathCross",
+    "name": "SHORT-ONLY Death Cross",
+    "type": "trend",
+    "timeframe": "1D",
+    "entry": {
+      "short": {
+        "SMA20_cross_below_SMA50": true,
+        "close_below_MA200": true,
+        "MA200_slope_negative": true,
+        "RSI_below_48": true,
+        "momentum_7d_negative": true,
+        "volume_above_ma20": true
+      }
+    },
+    "stop_loss": "3.5%",
+    "take_profit": "4.0%",
+    "max_holding": "15 bars",
+    "source": "auto_research",
+    "status": "verified",
+    "tier": "RELAXED_PF_3",
+    "metrics": {
+      "win_rate": 88.9,
+      "profit_factor": 9.14,
+      "max_drawdown": 3.5,
+      "sharpe": 1.34
+    }
+  },
+  {
+    "factor_id": "EMA_10_15_RSI_16_4H",
+    "name": "EMA(10,15) RSI(16) ATR Trailing 4H",
+    "type": "trend",
+    "timeframe": "4H",
+    "entry": {
+      "long": {
+        "EMA10_cross_above_EMA15": true,
+        "RSI_16_above_50": true
+      },
+      "short": {
+        "EMA10_cross_below_EMA15": true,
+        "RSI_16_below_50": true
+      }
+    },
+    "stop_loss": "1.0 ATR",
+    "take_profit": "ATR trailing (reverse EMA cross exit)",
+    "max_holding": "30 bars",
+    "source": "auto_research",
+    "status": "candidate",
+    "notes": "Based on 4H research: fast=10, slow=15, rsi_n=16, rsi_th=50. Exit on reverse EMA cross.",
+    "research_metrics": {
+      "source": "2026-03-27-4h-strategy.md",
+      "win_rate": 51.59,
+      "profit_factor": 2.25,
+      "max_drawdown": 24.99,
+      "sharpe": 2.3,
+      "total_trades": 157
+    }
+  },
+  {
+    "factor_id": "SHORT_DeathCross_4H",
+    "name": "SHORT-ONLY Death Cross 4H",
+    "type": "trend",
+    "timeframe": "4H",
+    "entry": {
+      "short": {
+        "SMA20_cross_below_SMA50": true,
+        "close_below_MA200": true,
+        "MA200_slope_negative": true,
+        "RSI_below_48": true,
+        "momentum_7d_negative": true,
+        "volume_above_ma20": true
+      }
+    },
+    "stop_loss": "3.5%",
+    "take_profit": "4.0%",
+    "max_holding": "15 bars",
+    "source": "auto_research",
+    "status": "candidate",
+    "notes": "4H version of SHORT_ONLY_DeathCross strategy"
+  },
+  {
+    "factor_id": "EMA_8_40_RSI_55_1D",
+    "name": "EMA(8,40) RSI(55) 1D",
+    "type": "trend",
+    "timeframe": "1D",
+    "entry": {
+      "long": {
+        "EMA8_cross_above_EMA40": true,
+        "RSI_above_55": true
+      },
+      "short": {
+        "EMA8_cross_below_EMA40": true,
+        "RSI_below_50": true
+      }
+    },
+    "stop_loss": "1.5 ATR",
+    "take_profit": "2.5 ATR",
+    "source": "auto_research",
+    "status": "candidate",
+    "notes": "Variant of EMA_Crossover_1D with tighter RSI filter (55 instead of 50 for long)"
+  },
+  {
+    "factor_id": "LONG_Breakout_4H",
+    "name": "LONG-ONLY Breakout 4H",
+    "type": "trend",
+    "timeframe": "4H",
+    "entry": {
+      "long": {
+        "EMA20_cross_above_EMA50": true,
+        "RSI_45_to_65": true,
+        "volume_above_1.2x_ma20": true,
+        "price_above_MA200": true
+      }
+    },
+    "stop_loss": "2.0 ATR",
+    "take_profit": "3.0 ATR",
+    "source": "auto_research",
+    "status": "candidate",
+    "notes": "LONG-ONLY breakout strategy with volume confirmation"
+  },
+  {
+    "factor_id": "BB_Squeeze_Volume_Breakout_4H",
+    "name": "BB Squeeze Volume Breakout 4H",
+    "type": "volatility",
+    "timeframe": "4H",
+    "entry": {
+      "long": {
+        "BB_width_below_SMA20": true,
+        "EMA9_above_EMA21": true,
+        "RSI_above_55": true,
+        "volume_above_1.5x_ma20": true
+      },
+      "short": {
+        "BB_width_below_SMA20": true,
+        "EMA9_below_EMA21": true,
+        "RSI_below_45": true,
+        "volume_above_1.5x_ma20": true
+      }
+    },
+    "stop_loss": "2.0 ATR",
+    "take_profit": "3.0 ATR",
+    "max_holding": "20 bars",
+    "source": "manual_research",
+    "status": "pending_review",
+    "logic_notes": "方向A：量先於價。布林帶寬度低於其20日均線=波動率壓縮（squeeze），通常預示方向性突破。放量1.5倍確認突破有效性。EMA9/EMA21多空排列過濾假突破。RSI過濾超買超賣區。層次：波動率壓縮→放量確認→動量方向→RSI過濾。"
+  },
+  {
+    "factor_id": "MultiTimeframe_Momentum_Resonance_4H",
+    "name": "Multi-Timeframe Momentum Resonance 4H",
+    "type": "momentum",
+    "timeframe": "4H",
+    "entry": {
+      "long": {
+        "1D_EMA8_above_EMA40": true,
+        "4H_RSI_below_40": true,
+        "4H_Stochastic_K_below_25": true,
+        "4H_price_above_MA50": true
+      },
+      "short": {
+        "1D_EMA8_below_EMA40": true,
+        "4H_RSI_above_60": true,
+        "4H_Stochastic_K_above_75": true,
+        "4H_price_below_MA50": true
+      }
+    },
+    "stop_loss": "2.5%",
+    "take_profit": "4.0%",
+    "max_holding": "15 bars",
+    "source": "manual_research",
+    "status": "pending_review",
+    "logic_notes": "方向B：多時間框架共振。大周期(1D)定方向，EMA8/EMA40多空排列確認趨勢。小周期(4H) RSI+KD同時處於極端區=動量衰竭後的反轉機會。4H價格在MA50上方過濾逆勢進場。層次：1D趨勢確認→4H超買超賣→KD隨機指標二次確認→價格結構過濾。"
+  },
+  {
+    "factor_id": "Volatility_Regime_Switch_1D",
+    "name": "Volatility Regime Switch 1D",
+    "type": "volatility",
+    "timeframe": "1D",
+    "entry": {
+      "long": {
+        "ATR_percentile_below_20": true,
+        "price_above_MA20": true,
+        "RSI_above_50": true,
+        "volume_above_ma20": true
+      },
+      "short": {
+        "ATR_percentile_below_20": true,
+        "price_below_MA20": true,
+        "RSI_below_50": true,
+        "volume_above_ma20": true
+      }
+    },
+    "stop_loss": "2.0 ATR",
+    "take_profit": "3.5 ATR",
+    "max_holding": "20 bars",
+    "source": "manual_research",
+    "status": "pending_review",
+    "logic_notes": "方向C：波動率體制識別。ATR處於歷史20%分位以下=低波動環境，價格通常進入盤整。之後放量突破+MA20方向明確=趨勢啟動信號。低波動進場+ATR分位作為領先指標，解決高波動期策略失效問題。層次：波動率壓縮識別→價格方向確認→RSI動量→成交量爆發確認。"
+  },
+  {
+    "factor_id": "Stochastic_RSI_Divergence_4H",
+    "name": "Stochastic RSI Divergence 4H",
+    "type": "momentum",
+    "timeframe": "4H",
+    "entry": {
+      "long": {
+        "Stochastic_K_cross_above_D_below_25": true,
+        "RSI_above_50": true,
+        "EMA20_above_EMA50": true,
+        "volume_above_1.2x_ma20": true
+      },
+      "short": {
+        "Stochastic_K_cross_below_D_above_75": true,
+        "RSI_below_50": true,
+        "EMA20_below_EMA50": true,
+        "volume_above_1.2x_ma20": true
+      }
+    },
+    "stop_loss": "2.0 ATR",
+    "take_profit": "3.0 ATR",
+    "max_holding": "18 bars",
+    "source": "manual_research",
+    "status": "pending_review",
+    "logic_notes": "方向D：KD隨機指標 + RSI 二次確認。KD在超賣區(<25)金叉+RSI>50=雙重確認的低吸機會，避免KD alone的假信號。EMA20/EMA50多空排列確認趨勢方向，避免逆勢。放量1.2倍MA20確認機構參與。層次：KD超賣區金叉→RSI確認動量→均線趨勢過濾→成交量確認。"
+  },
+  {
+    "factor_id": "MACD_Histogram_Convergence_1D",
+    "name": "MACD Histogram Convergence 1D",
+    "type": "trend",
+    "timeframe": "1D",
+    "entry": {
+      "long": {
+        "MACD_histogram_negative_to_converging": true,
+        "price_retest_MA20_above_MA50": true,
+        "RSI_above_50": true,
+        "EMA20_above_EMA50": true
+      },
+      "short": {
+        "MACD_histogram_positive_to_diverging": true,
+        "price_retest_MA20_below_MA50": true,
+        "RSI_below_50": true,
+        "EMA20_below_EMA50": true
+      }
+    },
+    "stop_loss": "2.5%",
+    "take_profit": "4.5%",
+    "max_holding": "15 bars",
+    "source": "manual_research",
+    "status": "pending_review",
+    "logic_notes": "方向E：MACD柱子縮減 + 價格結構。MACD histogram由負值收斂→代表空頭動能耗盡，是潛在反轉信號。價格回測MA20支撐+MA20>MA50=技術結構確認。RSI>50過濾進場時機。結合了動量指標與價格結構的雙重確認，減少假突破。層次：MACD動能衰竭→價格測試支撐→均線排列確認→RSI過濾。"
+  }
+]

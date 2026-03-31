@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>加密貨幣量化交易平台</title>
+    <style>
+        :root {
+            --bg-primary: #0D1117; --bg-secondary: #161B22; --bg-card: #21262D;
+            --text-primary: #E6EDF3; --text-secondary: #8B949E;
+            --accent-green: #10B981; --accent-red: #EF4444; --accent-blue: #3B82F6;
+            --accent-yellow: #F59E0B; --accent-orange: #F97316; --border-color: #30363D;
+            --skeleton-base: #21262D; --skeleton-shine: #30363D;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+        
+        /* ─── Skeleton Animation ─── */
+        @keyframes skeleton-shine {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .skeleton {
+            background: linear-gradient(90deg, var(--skeleton-base) 25%, var(--skeleton-shine) 50%, var(--skeleton-base) 75%);
+            background-size: 200% 100%;
+            animation: skeleton-shine 1.5s infinite;
+            border-radius: 6px;
+        }
+        .skeleton-text { height: 14px; margin-bottom: 8px; }
+        .skeleton-title { height: 24px; width: 60%; margin-bottom: 12px; }
+        .skeleton-circle { border-radius: 50%; }
+        
+        /* ─── Pull to Refresh ─── */
+        .pull-container { overflow: hidden; position: relative; }
+        .pull-indicator {
+            position: absolute; top: -50px; left: 0; right: 0; height: 50px;
+            display: flex; align-items: center; justify-content: center;
+            transition: top 0.3s; z-index: 100;
+        }
+        .pull-indicator.pulling { top: 0; }
+        .pull-indicator .spinner {
+            width: 24px; height: 24px; border: 3px solid var(--border-color);
+            border-top-color: var(--accent-blue); border-radius: 50%;
+            animation: spin 0.8s linear infinite; display: none;
+        }
+        .pull-indicator.refreshing .spinner { display: block; }
+        .pull-indicator.refreshing .arrow { display: none; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* ─── Header ─── */
+        header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px 20px; background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky; top: 0; z-index: 50;
+        }
+        .logo { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .logo-icon { font-size: 24px; }
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        .last-update-badge {
+            font-size: 11px; color: var(--text-secondary);
+            display: flex; align-items: center; gap: 4px;
+            padding: 4px 10px; background: var(--bg-card);
+            border-radius: 12px; border: 1px solid var(--border-color);
+        }
+        .last-update-badge .dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--accent-green);
+        }
+        .last-update-badge.stale .dot { background: var(--accent-yellow); }
+        .last-update-badge.error .dot { background: var(--accent-red); }
+        .last-update-badge.loading .dot { animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        .menu-btn {
+            background: var(--bg-card); border: 1px solid var(--border-color);
+            color: var(--text-primary); padding: 8px 12px; border-radius: 8px;
+            cursor: pointer; font-size: 18px;
+        }
+        
+        /* ─── Mobile Tabs ─── */
+        .bottom-nav {
+            display: none; position: fixed; bottom: 0; left: 0; right: 0;
+            background: var(--bg-secondary); border-top: 1px solid var(--border-color);
+            padding: 8px 0; z-index: 50;
+        }
+        @media (max-width: 768px) {
+            .bottom-nav { display: flex; justify-content: space-around; }
+            body { padding-bottom: 70px; }
+        }
+        .nav-item {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 4px; padding: 6px 12px; border-radius: 8px;
+            color: var(--text-secondary); font-size: 11px; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .nav-item.active { color: var(--accent-blue); background: rgba(59,130,246,0.1); }
+        .nav-item-icon { font-size: 20px; }
+        
+        /* ─── Container ─── */
+        .container { max-width: 1200px; margin: 0 auto; padding: 16px 16px 30px; }
+        
+        /* ─── Hero Panel - BTC Price ─── */
+        .hero-panel {
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-card) 100%);
+            border: 1px solid var(--border-color); border-radius: 16px;
+            padding: 24px 20px; margin-bottom: 16px;
+            position: relative; overflow: hidden;
+        }
+        .hero-panel::before {
+            content: ''; position: absolute; top: 0; right: 0;
+            width: 150px; height: 150px;
+            background: radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .hero-symbol { font-size: 14px; color: var(--text-secondary); margin-bottom: 8px; }
+        .hero-price { font-size: 42px; font-weight: 800; margin-bottom: 8px; letter-spacing: -1px; }
+        .hero-meta { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+        .hero-change { font-size: 16px; font-weight: 600; padding: 4px 12px; border-radius: 8px; }
+        .hero-change.positive { color: var(--accent-green); background: rgba(16,185,129,0.15); }
+        .hero-change.negative { color: var(--accent-red); background: rgba(239,68,68,0.15); }
+        .hero-fear { font-size: 13px; color: var(--text-secondary); }
+        .hero-fear span { font-weight: 600; }
+        .hero-actions { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .btn {
+            padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 600;
+            cursor: pointer; border: none; transition: all 0.2s;
+        }
+        .btn-primary { background: var(--accent-green); color: white; }
+        .btn-primary:hover { background: #0ea572; transform: translateY(-1px); }
+        .btn-secondary { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: var(--bg-secondary); }
+        
+        /* ─── Coin Selector ─── */
+        .coin-selector {
+            display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto;
+            padding-bottom: 8px; -webkit-overflow-scrolling: touch;
+        }
+        .coin-chip {
+            padding: 8px 14px; border-radius: 20px; font-size: 13px; font-weight: 600;
+            background: var(--bg-card); border: 1px solid var(--border-color);
+            color: var(--text-secondary); cursor: pointer; white-space: nowrap;
+            transition: all 0.2s;
+        }
+        .coin-chip.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+        .coin-chip:hover:not(.active) { border-color: var(--accent-blue); color: var(--text-primary); }
+        
+        /* ─── Grid Layout ─── */
+        .grid { display: grid; gap: 16px; }
+        @media (min-width: 768px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (min-width: 1024px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+        .grid-full { grid-column: 1 / -1; }
+        
+        /* ─── Card ─── */
+        .card {
+            background: var(--bg-card); border: 1px solid var(--border-color);
+            border-radius: 12px; padding: 16px;
+        }
+        .card-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 14px;
+        }
+        .card-title { font-size: 13px; color: var(--text-secondary); font-weight: 600; }
+        .card-action { font-size: 12px; color: var(--accent-blue); cursor: pointer; }
+        
+        /* ─── Signal Panel ─── */
+        .signal-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px; background: var(--bg-secondary); border-radius: 10px; margin-bottom: 10px;
+        }
+        .signal-item:last-child { margin-bottom: 0; }
+        .signal-icon { font-size: 28px; }
+        .signal-info { flex: 1; }
+        .signal-symbol { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+        .signal-desc { font-size: 12px; color: var(--text-secondary); }
+        .signal-confidence {
+            text-align: center; min-width: 50px;
+        }
+        .confidence-num { font-size: 20px; font-weight: 800; }
+        .confidence-label { font-size: 10px; color: var(--text-secondary); }
+        .signal-waiting {
+            text-align: center; padding: 24px; color: var(--text-secondary);
+            font-size: 14px;
+        }
+        .signal-waiting .spinner-small {
+            width: 20px; height: 20px; border: 2px solid var(--border-color);
+            border-top-color: var(--accent-blue); border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin: 0 auto 10px;
+        }
+        
+        /* ─── Coin Grid ─── */
+        .mini-coin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+        .mini-coin-card {
+            background: var(--bg-secondary); border-radius: 10px; padding: 12px;
+            cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden;
+        }
+        .mini-coin-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .mini-coin-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .mini-coin-name { font-size: 14px; font-weight: 700; }
+        .mini-coin-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; }
+        .mini-coin-badge.buy { background: rgba(16,185,129,0.2); color: var(--accent-green); }
+        .mini-coin-badge.sell { background: rgba(239,68,68,0.2); color: var(--accent-red); }
+        .mini-coin-badge.hold { background: rgba(139,148,158,0.2); color: var(--text-secondary); }
+        .mini-coin-price { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+        .mini-coin-change { font-size: 12px; font-weight: 600; }
+        .mini-coin-change.positive { color: var(--accent-green); }
+        .mini-coin-change.negative { color: var(--accent-red); }
+        .mini-coin-anomaly { position:absolute; top:6px; right:8px; font-size:13px; }
+        
+        /* ─── Fear & Greed ─── */
+        .fear-greed-display { text-align: center; }
+        .fg-emoji { font-size: 48px; margin-bottom: 8px; }
+        .fg-value { font-size: 36px; font-weight: 800; margin-bottom: 4px; }
+        .fg-label { font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; }
+        .fg-bar { height: 8px; background: linear-gradient(to right, var(--accent-red), var(--accent-yellow), var(--accent-green)); border-radius: 4px; position: relative; }
+        .fg-indicator {
+            position: absolute; top: -4px; width: 16px; height: 16px;
+            background: white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            transform: translateX(-50%); transition: left 0.5s ease;
+        }
+        
+        /* ─── Agent Status ─── */
+        .agent-mini-list { display: flex; flex-wrap: wrap; gap: 8px; }
+        .agent-chip {
+            display: flex; align-items: center; gap: 6px;
+            padding: 6px 12px; background: var(--bg-secondary); border-radius: 20px; font-size: 12px;
+        }
+        .agent-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .agent-dot.green { background: var(--accent-green); }
+        .agent-dot.yellow { background: var(--accent-yellow); }
+        .agent-dot.gray { background: var(--text-secondary); }
+        
+        /* ─── Ranking Preview ─── */
+        .rank-preview { display: flex; flex-direction: column; gap: 8px; }
+        .rank-row {
+            display: flex; align-items: center; gap: 10px;
+            padding: 8px 10px; background: var(--bg-secondary); border-radius: 8px;
+        }
+        .rank-num { font-size: 12px; font-weight: 700; width: 20px; text-align: center; }
+        .rank-1 { color: #FFD700; }
+        .rank-2 { color: #C0C0C0; }
+        .rank-3 { color: #CD7F32; }
+        .rank-name { flex: 1; font-size: 13px; font-weight: 500; }
+        .rank-score { font-size: 13px; font-weight: 700; }
+        
+        /* ─── Error State ─── */
+        .error-state {
+            text-align: center; padding: 20px; color: var(--text-secondary);
+        }
+        .error-state .icon { font-size: 32px; margin-bottom: 8px; }
+        .stale-data-notice {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 11px; color: var(--accent-yellow); margin-top: 8px;
+        }
+        .articles-list { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-color); }
+        .article-item { padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+        .article-item:last-child { border-bottom: none; }
+        .article-title { font-size: 13px; font-weight: 500; margin-bottom: 4px; line-height: 1.4; }
+        .article-title a { color: var(--text-primary); text-decoration: none; }
+        .article-title a:hover { text-decoration: underline; }
+        .article-meta { font-size: 11px; color: var(--text-secondary); }
+        .article-sentiment { font-weight: 600; }
+        .article-sentiment.positive { color: var(--accent-green); }
+        .article-sentiment.neutral { color: var(--accent-yellow); }
+        .article-sentiment.negative { color: var(--accent-red); }
+        
+        /* ─── Quick Stats ─── */
+        .quick-stats { display: flex; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); }
+        .stat-item { flex: 1; text-align: center; }
+        .stat-value { font-size: 16px; font-weight: 700; }
+        .stat-label { font-size: 10px; color: var(--text-secondary); }
+        
+        /* ─── Responsive tweaks ─── */
+        @media (max-width: 768px) {
+            .hero-price { font-size: 32px; }
+            .container { padding: 12px 12px 80px; }
+            .grid { gap: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">
+        <span class="logo-icon">🚀</span>
+        <span>加密貨幣量化平台</span>
+    </div>
+    <div class="header-right">
+        <div class="last-update-badge loading" id="update-badge">
+            <span class="dot"></span>
+            <span id="update-time">連接中...</span>
+        </div>
+        <button class="menu-btn" onclick="toggleMenu()">☰</button>
+    </div>
+</header>
+
+<!-- Pull to Refresh Indicator -->
+<div class="pull-indicator" id="pull-indicator">
+    <div class="arrow">↓ 下拉刷新</div>
+    <div class="spinner"></div>
+</div>
+
+<div class="container" id="main-content">
+    
+    <!-- Hero: BTC Price Panel -->
+    <div class="hero-panel" id="hero-panel">
+        <div class="hero-symbol">BTC/USDT</div>
+        <div class="hero-price skeleton" id="hero-price-skeleton" style="width:180px;height:42px;"></div>
+        <div class="hero-price" id="hero-price" style="display:none;">--</div>
+        <div class="hero-meta">
+            <div class="hero-change positive skeleton" id="hero-change-skeleton" style="width:80px;height:28px;"></div>
+            <div class="hero-change" id="hero-change" style="display:none;"></div>
+            <div class="hero-fear" id="hero-fear">情緒載入中...</div>
+        </div>
+        <div class="hero-actions">
+            <button class="btn btn-primary" id="btn-entry" style="display:none;">★★★ 強力進場</button>
+            <button class="btn btn-secondary" id="btn-detail" style="display:none;">查看詳情 ▼</button>
+        </div>
+    </div>
+    
+    <!-- Coin Selector -->
+    <div class="coin-selector" id="coin-selector">
+        <div class="coin-chip skeleton" style="width:60px;height:34px;"></div>
+        <div class="coin-chip skeleton" style="width:60px;height:34px;"></div>
+        <div class="coin-chip skeleton" style="width:60px;height:34px;"></div>
+    </div>
+    
+    <!-- Signals Panel -->
+    <div class="card grid-full">
+        <div class="card-header">
+            <span class="card-title">🚀 進場訊號</span>
+            <span class="card-action" onclick="showAllSignals()">查看全部</span>
+        </div>
+        <div id="signals-container">
+            <div class="signal-waiting">
+                <div class="spinner-small"></div>
+                等待下一個訊號...
+            </div>
+        </div>
+    </div>
+    
+    <!-- Grid: 2 columns on tablet, 3 on desktop -->
+    <div class="grid">
+        
+        <!-- Top Coins -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">🪙 Top 20 幣種</span>
+                <span class="card-action" onclick="showAllCoins()">更多</span>
+            </div>
+            <div class="mini-coin-grid" id="coin-grid">
+                <div class="skeleton skeleton-text" style="grid-column:1/-1;"></div>
+                <div class="skeleton" style="height:80px;"></div>
+                <div class="skeleton" style="height:80px;"></div>
+                <div class="skeleton" style="height:80px;"></div>
+                <div class="skeleton" style="height:80px;"></div>
+            </div>
+        </div>
+        
+        <!-- Fear & Greed -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">😀 市場情緒</span>
+            </div>
+            <div class="fear-greed-display" id="fear-greed-display">
+                <div class="fg-emoji skeleton" style="width:48px;height:48px;margin:0 auto 8px;"></div>
+                <div class="fg-value skeleton" style="width:80px;height:36px;margin:0 auto 4px;"></div>
+                <div class="fg-label skeleton" style="width:60px;margin:0 auto 12px;"></div>
+                <div class="fg-bar skeleton" style="height:8px;"></div>
+            </div>
+            <div class="quick-stats" id="quick-stats">
+                <div class="stat-item">
+                    <div class="stat-value skeleton" style="width:40px;height:16px;margin:0 auto;"></div>
+                    <div class="stat-label">討論量</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value skeleton" style="width:40px;height:16px;margin:0 auto;"></div>
+                    <div class="stat-label">Twitter</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value skeleton" style="width:40px;height:16px;margin:0 auto;"></div>
+                    <div class="stat-label">Reddit</div>
+                </div>
+            </div>
+            <div class="articles-list" id="articles-list">
+                <div class="skeleton skeleton-text" style="width:80%;"></div>
+                <div class="skeleton skeleton-text" style="width:60%;"></div>
+            </div>
+        </div>
+        
+        <!-- Strategy Ranking -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">🏆 策略排行</span>
+                <span class="card-action" onclick="showRanking()">詳細</span>
+            </div>
+            <div class="rank-preview" id="rank-preview">
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text"></div>
+            </div>
+        </div>
+        
+        <!-- Agent Status -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">🤖 Agent 狀態</span>
+            </div>
+            <div class="agent-mini-list" id="agent-list">
+                <div class="skeleton" style="width:100px;height:32px;border-radius:16px;"></div>
+                <div class="skeleton" style="width:100px;height:32px;border-radius:16px;"></div>
+                <div class="skeleton" style="width:100px;height:32px;border-radius:16px;"></div>
+            </div>
+        </div>
+        
+    </div>
+    
+</div>
+
+<!-- Bottom Navigation (Mobile) -->
+<div class="bottom-nav">
+    <div class="nav-item active" onclick="navTo('dashboard')">
+        <span class="nav-item-icon">📊</span>
+        <span>行情</span>
+    </div>
+    <div class="nav-item" onclick="navTo('signals')">
+        <span class="nav-item-icon">🔔</span>
+        <span>訊號</span>
+    </div>
+    <div class="nav-item" onclick="navTo('ranking')">
+        <span class="nav-item-icon">🏆</span>
+        <span>排行</span>
+    </div>
+    <div class="nav-item" onclick="navTo('sentiment')">
+        <span class="nav-item-icon">💬</span>
+        <span>情緒</span>
+    </div>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+let currentCoin = 'BTCUSDT';
+let lastSuccessfulUpdate = null;
+let cachedData = {
+    topCoins: [],
+    sentiment: null,
+    signals: [],
+    rankings: []
+};
+
+// ─── Update Badge ───
+function updateBadge(status, timeStr) {
+    const badge = document.getElementById('update-badge');
+    const timeEl = document.getElementById('update-time');
+    badge.className = 'last-update-badge ' + status;
+    timeEl.textContent = timeStr;
+}
+
+// ─── Fetch with Cache & Error Handling ───
+async function fetchAPI(endpoint, cacheKey) {
+    try {
+        const r = await fetch(API_BASE + endpoint);
+        if (!r.ok) throw new Error('API error ' + r.status);
+        const data = await r.json();
+        if (cacheKey) cachedData[cacheKey] = data;
+        return data;
+    } catch (e) {
+        console.warn('Fetch failed for', endpoint, e.message);
+        return cachedData[cacheKey] || null; // Return cached or null
+    }
+}
+
+// ─── Pull to Refresh ───
+let touchStartY = 0;
+let touchEndY = 0;
+const pullIndicator = document.getElementById('pull-indicator');
+
+document.addEventListener('touchstart', e => { touchStartY = e.changedTouches[0].screenY; }, { passive: true });
+document.addEventListener('touchend', e => {
+    touchEndY = e.changedTouches[0].screenY;
+    if (touchStartY < 50 && touchEndY - touchStartY > 100) {
+        pullIndicator.classList.add('refreshing');
+        updateBadge('loading', '刷新中...');
+        refreshAll().then(() => {
+            pullIndicator.classList.remove('refreshing');
+        });
+    }
+}, { passive: true });
+
+window.addEventListener('scroll', () => {
+    const scrollY = window.scrollY;
+    if (scrollY < 50) {
+        pullIndicator.style.top = (-50 + scrollY) + 'px';
+        pullIndicator.classList.add('pulling');
+    } else {
+        pullIndicator.style.top = '0px';
+    }
+    if (scrollY > 50) pullIndicator.classList.remove('pulling');
+});
+
+// ─── Refresh Functions ───
+async function refreshHero() {
+    const d = await fetchAPI('/api/price/' + currentCoin, 'price');
+    const heroPrice = document.getElementById('hero-price');
+    const heroSkeleton = document.getElementById('hero-price-skeleton');
+    const heroChange = document.getElementById('hero-change');
+    const heroChangeSkeleton = document.getElementById('hero-change-skeleton');
+    
+    if (d && d.price) {
+        heroSkeleton.style.display = 'none';
+        heroPrice.style.display = 'block';
+        heroPrice.textContent = '$' + parseFloat(d.price).toLocaleString();
+        
+        const change = d.change_24h || 0;
+        const prefix = change >= 0 ? '+' : '';
+        heroChangeSkeleton.style.display = 'none';
+        heroChange.style.display = 'block';
+        heroChange.className = 'hero-change ' + (change >= 0 ? 'positive' : 'negative');
+        heroChange.textContent = prefix + change.toFixed(2) + '%';
+        
+        document.getElementById('btn-entry').style.display = 'inline-block';
+        document.getElementById('btn-detail').style.display = 'inline-block';
+        
+        lastSuccessfulUpdate = new Date();
+        updateBadge('', '更新於 ' + formatTime(lastSuccessfulUpdate));
+    }
+}
+
+async function refreshSentiment() {
+    const d = await fetchAPI('/api/sentiment/' + currentCoin.replace('USDT', ''), 'sentiment');
+    const container = document.getElementById('fear-greed-display');
+    
+    if (d && d.fear_greed_index !== undefined) {
+        const idx = d.fear_greed_index;
+        const cfg = [
+            {min:0,max:25,emoji:'😱',label:'極度恐懼',color:'#EF4444'},
+            {min:25,max:45,emoji:'😰',label:'恐懼',color:'#F97316'},
+            {min:45,max:55,emoji:'😐',label:'中性',color:'#F59E0B'},
+            {min:55,max:75,emoji:'🙂',label:'貪婪',color:'#84CC16'},
+            {min:75,max:100,emoji:'😁',label:'極度貪婪',color:'#10B981'}
+        ];
+        const info = cfg.find(c => idx >= c.min && idx <= c.max) || cfg[2];
+        
+        container.innerHTML = `
+            <div class="fg-emoji">${info.emoji}</div>
+            <div class="fg-value" style="color:${info.color}">${idx}</div>
+            <div class="fg-label">${info.label}</div>
+            <div class="fg-bar"><div class="fg-indicator" style="left:${idx}%"></div></div>
+        `;
+        
+        document.getElementById('hero-fear').innerHTML = `情緒指數: <span style="color:${info.color};font-weight:600;">${info.label} (${idx})</span>`;
+        
+        // Quick stats
+        document.getElementById('quick-stats').innerHTML = `
+            <div class="stat-item">
+                <div class="stat-value">${d.discussion_volume || '--'}</div>
+                <div class="stat-label">討論量</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">${d.twitter_posts_analyzed || 0}</div>
+                <div class="stat-label">Twitter</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">${d.reddit_posts_analyzed || 0}</div>
+                <div class="stat-label">Reddit</div>
+            </div>
+        `;
+
+        // Articles - clickable with target="_blank"
+        const articlesContainer = document.getElementById('articles-list');
+        const articles = d.articles || [];
+        if (articles.length > 0) {
+            articlesContainer.innerHTML = articles.slice(0, 5).map(a => {
+                const sentClass = a.sentiment >= 0.6 ? 'positive' : a.sentiment >= 0.4 ? 'neutral' : 'negative';
+                const sentLabel = a.sentiment >= 0.6 ? '🟢' : a.sentiment >= 0.4 ? '🟡' : '🔴';
+                const timeAgo = a.created_utc ? new Date(a.created_utc).toLocaleDateString('zh-TW') : '';
+                const linkHtml = a.url
+                    ? '<a href="' + a.url + '" target="_blank" rel="noopener" title="點擊開啟文章">' + a.title + '</a>'
+                    : '<span>' + a.title + '</span>';
+                return `<div class="article-item">
+                    <div class="article-title">${linkHtml}</div>
+                    <div class="article-meta">${a.source || ''} ${timeAgo ? '| ' + timeAgo : ''} <span class="article-sentiment ${sentClass}">${sentLabel} ${(a.sentiment * 100).toFixed(0)}%</span></div>
+                </div>`;
+            }).join('');
+        } else {
+            articlesContainer.innerHTML = '<div style="text-align:center;color:var(--text-secondary);font-size:12px;padding:8px 0;">暫無文章</div>';
+        }
+    }
+}
+
+async function refreshTopCoins() {
+    const d = await fetchAPI('/api/topcoins', 'topCoins');
+    const grid = document.getElementById('coin-grid');
+    const selector = document.getElementById('coin-selector');
+    
+    if (d && Array.isArray(d) && d.length > 0) {
+        // Coin selector chips
+        const coins = d.slice(0, 10);
+        selector.innerHTML = coins.map((c, i) => 
+            `<div class="coin-chip ${i === 0 ? 'active' : ''}" onclick="selectCoin('${c.symbol}', this)">${c.symbol}</div>`
+        ).join('');
+        
+        // Coin grid (show top 6 on main page)
+        grid.innerHTML = d.slice(0, 6).map(c => {
+            const changeClass = c.change_24h >= 0 ? 'positive' : 'negative';
+            const prefix = c.change_24h >= 0 ? '+' : '';
+            const badgeClass = c.signal === 'BUY' ? 'buy' : c.signal === 'SELL' ? 'sell' : 'hold';
+            const priceStr = c.price < 1 ? '$' + c.price.toFixed(6) : '$' + c.price.toLocaleString();
+            const anomalyIcon = c.has_anomaly
+                ? '<span class="mini-coin-anomaly" title="' + (c.anomaly_title || '異常警報') + '">' + (c.anomaly_severity === 'critical' ? '🚨' : '⚠️') + '</span>'
+                : '';
+            return `<div class="mini-coin-card" onclick="selectCoin('${c.symbol}')">
+                ${anomalyIcon}
+                <div class="mini-coin-top">
+                    <span class="mini-coin-name">${c.symbol}</span>
+                    <span class="mini-coin-badge ${badgeClass}">${c.signal}</span>
+                </div>
+                <div class="mini-coin-price">${priceStr}</div>
+                <div class="mini-coin-change ${changeClass}">${prefix}${c.change_24h}%</div>
+            </div>`;
+        }).join('');
+        
+        // Show stale notice if using cached
+        if (!lastSuccessfulUpdate) {
+            // Nothing
+        }
+    } else if (cachedData.topCoins.length > 0) {
+        // Show cached with notice
+        const d = cachedData.topCoins;
+        grid.innerHTML = d.slice(0, 6).map(c => {
+            const changeClass = c.change_24h >= 0 ? 'positive' : 'negative';
+            const prefix = c.change_24h >= 0 ? '+' : '';
+            const anomalyIcon = c.has_anomaly
+                ? '<span class="mini-coin-anomaly" title="' + (c.anomaly_title || '異常警報') + '">' + (c.anomaly_severity === 'critical' ? '🚨' : '⚠️') + '</span>'
+                : '';
+            return `<div class="mini-coin-card">
+                ${anomalyIcon}
+                <div class="mini-coin-top"><span class="mini-coin-name">${c.symbol}</span></div>
+                <div class="mini-coin-price">$${c.price.toLocaleString()}</div>
+                <div class="mini-coin-change ${changeClass}">${prefix}${c.change_24h}%</div>
+            </div>`;
+        }).join('') + `<div class="stale-data-notice">⚠️ 顯示快取資料（網路錯誤）</div>`;
+    }
+}
+
+async function refreshSignals() {
+    const d = await fetchAPI('/api/signals', 'signals');
+    const container = document.getElementById('signals-container');
+    
+    if (d && d.length > 0) {
+        const latest = d[d.length - 1];
+        container.innerHTML = d.slice().reverse().slice(0, 3).map(s => {
+            const isBullish = s.direction === 'LONG' || s.signal.includes('GOLDEN') || s.signal.includes('BUY');
+            const isBearish = s.signal.includes('DEATH') || s.signal.includes('SELL');
+            const icon = isBullish ? '📈' : isBearish ? '📉' : '➡️';
+            const color = isBullish ? 'var(--accent-green)' : isBearish ? 'var(--accent-red)' : 'var(--text-secondary)';
+            const stars = s.ai_confidence >= 80 ? '★★★★' : s.ai_confidence >= 60 ? '★★★' : '★★';
+            
+            return `<div class="signal-item">
+                <span class="signal-icon">${icon}</span>
+                <div class="signal-info">
+                    <div class="signal-symbol">${s.symbol}</div>
+                    <div class="signal-desc">${s.signal} · ${stars}</div>
+                </div>
+                <div class="signal-confidence">
+                    <div class="confidence-num" style="color:${color}">${s.ai_confidence.toFixed(0)}%</div>
+                    <div class="confidence-label">信心</div>
+                </div>
+            </div>`;
+        }).join('');
+    } else {
+        container.innerHTML = `<div class="signal-waiting">
+            <div class="spinner-small"></div>
+            等待下一個訊號...
+        </div>`;
+    }
+}
+
+async function refreshRankings() {
+    const d = await fetchAPI('/api/rankings', 'rankings');
+    const container = document.getElementById('rank-preview');
+    
+    if (d && d.rankings && d.rankings.length > 0) {
+        const colors = ['rank-1', 'rank-2', 'rank-3'];
+        container.innerHTML = d.rankings.slice(0, 5).map((r, i) => {
+            const sColor = r.score >= 70 ? 'var(--accent-green)' : r.score >= 50 ? 'var(--accent-yellow)' : 'var(accent-red);
+            return `<div class="rank-row">
+                <span class="rank-num ${colors[i] || ''}">${i + 1}</span>
+                <span class="rank-name">${r.strategy}</span>
+                <span class="rank-score" style="color:${sColor}">${r.score.toFixed(1)}</span>
+            </div>`;
+        }).join('');
+    } else {
+        container.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-secondary);">暫無排行資料</div>';
+    }
+}
+
+function refreshAgents() {
+    const agents = [
+        { name: 'CEO', status: 'green', task: '決策' },
+        { name: 'Eng', status: 'green', task: '開發' },
+        { name: 'QA', status: 'yellow', task: '審核' },
+        { name: 'Researcher', status: 'green', task: '研究' },
+    ];
+    document.getElementById('agent-list').innerHTML = agents.map(a => 
+        `<div class="agent-chip"><span class="agent-dot ${a.status}"></span>${a.name}</div>`
+    ).join('');
+}
+
+// ─── Coin Selection ───
+function selectCoin(symbol, el) {
+    currentCoin = symbol;
+    document.querySelectorAll('.coin-chip').forEach(c => c.classList.remove('active'));
+    if (el) el.classList.add('active');
+    
+    document.getElementById('hero-price-skeleton').style.display = 'block';
+    document.getElementById('hero-price').style.display = 'none';
+    document.getElementById('hero-change-skeleton').style.display = 'block';
+    document.getElementById('hero-change').style.display = 'none';
+    
+    refreshHero();
+    refreshSentiment();
+}
+
+// ─── Navigation ───
+function navTo(page) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    event.target.closest('.nav-item').classList.add('active');
+    // In a real app, this would switch views
+}
+
+function toggleMenu() {
+    // Placeholder for menu
+}
+
+function showAllSignals() { /* Navigate to signals page */ }
+function showAllCoins() { /* Navigate to coins page */ }
+function showRanking() { /* Navigate to ranking page */ }
+
+// ─── Time Formatter ───
+function formatTime(date) {
+    if (!date) return '--';
+    return date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ─── Main Refresh ───
+async function refreshAll() {
+    updateBadge('loading', '載入中...');
+    await Promise.all([
+        refreshHero(),
+        refreshTopCoins(),
+        refreshSentiment(),
+        refreshSignals(),
+        refreshRankings()
+    ]);
+    refreshAgents();
+    lastSuccessfulUpdate = new Date();
+    updateBadge('', '更新於 ' + formatTime(lastSuccessfulUpdate));
+}
+
+// ─── Auto Refresh ───
+refreshAll();
+setInterval(refreshAll, 30000);
+
+// ─── Error Handling: Show last update when API fails ───
+setInterval(() => {
+    if (lastSuccessfulUpdate) {
+        const elapsed = Math.floor((Date.now() - lastSuccessfulUpdate.getTime()) / 1000);
+        if (elapsed > 60) {
+            updateBadge('stale', '更新於 ' + formatTime(lastSuccessfulUpdate) + ' (逾期)');
+        }
+    }
+}, 10000);
+</script>
+
+</body>
+</html>

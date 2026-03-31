@@ -1,0 +1,430 @@
+# =============================================================================
+# 標準化策略描述格式 (Strategy Template Format)
+# =============================================================================
+# 版本：1.0
+# 用途：讓研究 Agent 與 QA Agent 獨立實作同一策略，確保結果一致
+#
+# 使用原則：
+# 1. 研究 Agent 必須嚴格按照此格式填寫每一個欄位
+# 2. 每一個數值、條件、計算方式都必須明確寫出，無例外
+# 3. 禁止使用模糊詞彙：「動態」、「合理」、「適當」
+# 4. 所有判斷都必須有精確的觸發條件與執行方式
+# =============================================================================
+
+StrategyTemplate:
+  name: "策略名稱"
+  version: "1.0"
+
+  # ---------------------------------------------------------------------------
+  # 指標計算 (indicator_calculation)
+  # ---------------------------------------------------------------------------
+  # 每一個技術指標都必須獨立定義，包含：
+  # - type: 指標類型 (SMA, EMA, WMA, RSI, ATR, MACD, BOLL, etc.)
+  # - price: 使用哪個價格 (close, open, high, low, hl2, hlc3, ohlc4)
+  # - period: 計算週期 (整數)
+  # - calculation: 完整的計算公式或描述
+  # - 任何特殊參數 (如 ATR 的 true_range 計算方式)
+  indicator_calculation:
+
+    # [範例] 簡單移動平均線
+    ma20:
+      type: "SMA"                                              # SMA | EMA | WMA
+      price: "close"                                           # close | open | high | low | hl2 | hlc3 | ohlc4
+      period: 20
+      description: "過去 20 根 K 線收盤價的簡單平均"
+      formula: "SMA = (C[0] + C[-1] + ... + C[-19]) / 20"
+
+    # [範例] RSI
+    rsi14:
+      type: "RSI"
+      price: "close"
+      period: 14
+      description: "標準 Relative Strength Index"
+      formula: |
+        RS = 平均漲幅 / 平均跌幅
+        RSI = 100 - (100 / (1 + RS))
+      # 上漲/下跌的定義（可選，明確則更好）
+      price_change: "close - close[-1]"
+      gain: "max(price_change, 0)"
+      loss: "max(-price_change, 0)"
+
+    # [範例] ATR (Average True Range)
+    atr14:
+      type: "ATR"
+      period: 14
+      description: "True Range 的 14 期平滑平均"
+      true_range_definition: "max(H-L, |H-PC|, |L-PC|)"
+      # PC = 前一根 K 線收盤價 (Previous Close)
+      true_range_formula: |
+        TR = max(H - L, |H - PC|, |L - PC|)
+        ATR = SMA(TR, 14)  # 或 EMA(TR, 14)，依 type 而定
+      smoothing: "SMA"                             # SMA | EMA | RMA (Wilder's)
+
+    # [範例] 動量指標
+    momentum_7d:
+      type: "momentum"
+      period: 7
+      description: "7 根 K 線動量百分比"
+      formula: "(close - close[-7]) / close[-7] * 100"
+      unit: "percent"
+
+    # [範例] 均線斜率
+    ma200_slope:
+      type: "slope_percent"
+      base_indicator: "ma200"
+      lookback: 20                                 # 用多少根 K 線前的 MA 來計算斜率
+      description: "MA200 在 20 根 K 線內的變化百分比"
+      formula: "(ma200_current - ma200[-20]) / ma200[-20] * 100"
+      threshold_bull: 0.1                           # 牛市閾值 (> 此值為上升趨勢)
+      threshold_bear: -0.1                          # 熊市閾值 (< 此值為下降趨勢)
+
+    # [範例] MACD
+    macd:
+      type: "MACD"
+      fast_period: 12
+      slow_period: 26
+      signal_period: 9
+      price: "close"
+      description: "MACD = EMA12 - EMA26，Signal = EMA9(MACD)"
+      macd_line: "EMA(fast) - EMA(slow)"
+      signal_line: "EMA(macd_line, signal_period)"
+      histogram: "macd_line - signal_line"
+
+    # [範例] 布林帶
+    boll20:
+      type: "BOLL"
+      period: 20
+      std_dev: 2
+      price: "close"
+      middle: "SMA(close, 20)"
+      upper: "middle + 2 * STD(close, 20)"
+      lower: "middle - 2 * STD(close, 20)"
+
+  # ---------------------------------------------------------------------------
+  # 進場規則 (entry)
+  # ---------------------------------------------------------------------------
+  # 每一個進場方向 (long / short) 都必須完整描述
+  # - signal: 信號邏輯 (AND = 所有條件都滿足, OR = 任一條件滿足, CROSS_UP/DOWN)
+  # - conditions: 條件陣列，每個條件都要寫清楚
+  # - all_required: true 表示 AND邏輯，false 表示 OR邏輯
+  entry:
+
+    long:
+      signal: "AND"                                 # AND | OR
+      all_required: true
+      conditions:
+        # 格式：「指標 操作符 閾值  # 註釋說明意圖」
+        - "MA20 CROSS_ABOVE MA50                    # 金叉：MA20 上穿 MA50"
+        # CROSS_ABOVE 定義：current.MA20 > current.MA50 AND previous.MA20 <= previous.MA50
+        - "RSI14 > 50                                # RSI 在多方區"
+        - "momentum_7d > 0.5                         # 7日動量為正"
+        - "close > ma200                            # 價格在 200 日均線上方"
+        - "ma200_slope > 0.1                         # 200 日均線上升趨勢（牛市 regime）"
+
+      # [可選] 進場限制
+      entry_restrictions:
+        max_entries_per_day: 1                      # 每天最多進場次數
+        min_gap_bars: 5                             # 兩次進場最小間隔（根數）
+
+    short:
+      signal: "AND"
+      all_required: true
+      conditions:
+        - "MA20 CROSS_BELOW MA50                     # 死叉：MA20 下穿 MA50"
+        # CROSS_BELOW 定義：current.MA20 < current.MA50 AND previous.MA20 >= previous.MA50
+        - "RSI14 < 48                                # RSI 在空方區（低於 48 非只是<50）"
+        - "momentum_7d < -0.5                        # 7日動量為負"
+        - "close < ma200                             # 價格在 200 日均線下方"
+        - "ma200_slope < -0.1                        # 200 日均線下降趨勢（熊市 regime）"
+
+  # ---------------------------------------------------------------------------
+  # 止損規則 (stop_loss)
+  # ---------------------------------------------------------------------------
+  # 完全明確：類型、數值、ATR怎麼算、觸發條件、成交方式
+  stop_loss:
+    type: "fixed_percent"                           # fixed_percent | atr_multiple | trailing_stop | price_structure
+
+    # --- 如果是固定百分比 ---
+    value: 0.03                                     # 3% 虧損
+    # 止損金額 = 進場價格 * 0.03
+    # 止損價 = 進場價格 * (1 - 0.03) = 進場價格 * 0.97
+
+    # --- 如果是 ATR 倍數（註解掉上面，開啟下面）---
+    # type: "atr_multiple"
+    # atr_multiple: 1.5                              # 1.5 倍 ATR
+    # atr_reference: "atr14"                        # 引用上面的 atr14 指標
+    # atr_calc_price: "hl2"                          # ATR 計算時用什麼價格 (close | hl2 | hlc3)
+    # stop_price: "entry_price - atr_multiple * atr_value"
+    # 備註：atr_multiple 乘以的是 ATR 數值，不是進場價格
+
+    # --- 如果是結構性止損 ---
+    # type: "price_structure"
+    # reference: "recent_swing_low"                  # 近 N 根 K 線的低點
+    # lookback: 5
+    # distance: "min(atr14 * 0.5, 0.02)"             # 不超過 ATR 的一半或 2%
+
+    trigger: "close_of_bar"                         # immediate | close_of_bar | candle_close_confirm
+    # immediate: 當價格觸及立即成交（可能滑價）
+    # close_of_bar: 當根 K 線收盤價低於止損價才成交
+    # candle_close_confirm: K 線收盤確認後才成交
+
+    execution: "next_open"                          # next_open | stop_price | market
+    # next_open: 以下一根 K 線開盤價成交
+    # stop_price: 以止損價掛單成交
+    # market: 以市價立即成交
+
+    # --- 追蹤停損（如果是 trailing_stop 類型）---
+    # activation: 0.02                               # 盈利超過 2% 後才啟動追蹤
+    # lock_profit_pct: 0.50                          # 鎖定 50% 的浮動盈利
+    # trailing_distance: "atr14 * 1.0"              # 追蹤距離 = 1 倍 ATR
+    # update_frequency: "every_bar"                  # every_bar | on_new_high_low
+
+  # ---------------------------------------------------------------------------
+  # 止盈規則 (take_profit)
+  # ---------------------------------------------------------------------------
+  take_profit:
+    type: "fixed_percent"
+    value: 0.07                                     # 7% 止盈
+    # 止盈價 = 進場價格 * (1 + 0.07) = 進場價格 * 1.07
+
+    trigger: "close_of_bar"
+    execution: "next_open"
+
+    # --- ATR 倍數止盈（註解）---
+    # type: "atr_multiple"
+    # atr_multiple: 3.0
+    # atr_reference: "atr14"
+    # profit_target: "entry_price + atr_multiple * atr_value"
+
+    # --- 移動止盈（註解）---
+    # type: "trailing_stop"
+    # activation: 0.05                               # 盈利 5% 後啟動
+    # trailing_distance: 0.02                        # 持續鎖定 2% 的走勢
+
+  # ---------------------------------------------------------------------------
+  # 出場優先順序 (exit_priority)
+  # ---------------------------------------------------------------------------
+  # 定義每次檢查倉位時的判斷順序（先檢查誰）
+  # 陣列順序即為檢查順序
+  exit_priority:
+    order:
+      - "take_profit"                               # 1. 先檢查是否觸及止盈
+      - "stop_loss"                                 # 2. 再檢查是否觸及止損
+      - "max_holding_bars"                          # 3. 超過最大持倉時間
+      - "reverse_signal"                            # 4. 出現反向進場信號
+
+    # 最大持倉時間（以 K 線根數計算）
+    max_holding_bars: 15
+
+    # 出現反向信號時是否立即出场
+    # true = 出現反向信號時，下一根 K 線開盤立即平倉並反向開倉
+    # false = 忽略反向信號，等止盈/止損/時間到
+    reverse_signal_immediate_exit: true
+
+  # ---------------------------------------------------------------------------
+  # 風控規則 (risk_management)
+  # ---------------------------------------------------------------------------
+  risk_management:
+
+    # 倉位大小計算方式
+    position_size_method: "percent_of_equity"       # fixed_amount | percent_of_equity | risk_percent
+    position_size_value: 1.0                       # 100% 倉（全部本金）
+    # percent_of_equity: 每次投入帳戶的 X%
+    # fixed_amount: 每次投入固定金額（如 1000 USDT）
+    # risk_percent: 根據止損距離計算倉位，限制每筆風險為帳戶的 X%
+
+    # 風險百分比模式（可選）
+    # risk_per_trade: 0.01                          # 每筆交易最多風險 1% 帳戶
+    # position_size: "risk_per_trade / stop_loss_pct"
+    # 範例：帳戶 10000，風險 1% = 100，止損 3% → 倉位 = 100/0.03 = 3333
+
+    # 最大同時持倉數
+    max_positions: 1
+
+    # 是否允許做空
+    allow_short: true
+
+    # 允許的交易標的（可選）
+    allowed_assets:
+      - "BTC/USDT"
+      - "ETH/USDT"
+      # - "SOL/USDT"
+
+    # 槓桿（可選）
+    leverage: 1                                     # 1 = 無槓桿
+    max_leverage: 3
+
+    # 滑價容忍（可選）
+    slippage_tolerance: 0.001                       # 0.1% 滑價容忍
+
+    # 隔離風控（可選）
+    max_daily_loss: 0.05                            # 每天最大虧損 5%
+    max_drawdown: 0.15                              # 總資金最大回撤 15%
+    pause_after_max_loss: true                     # 觸發後暫停交易
+
+  # ---------------------------------------------------------------------------
+  # 進場後特殊邏輯 (post_entry)
+  # ---------------------------------------------------------------------------
+  # 進場後可能需要調整止損（移動止損、时间止损等）
+  post_entry:
+
+    # 是否啟用移動止損（trailing stop）
+    trailing_stop_enabled: false
+    # trailing_stop_activation: 0.02                # 盈利 > 2% 後啟動
+    # trailing_stop_distance: 0.015                # 維持 1.5% 的移動停損距離
+
+    # 是否分批出場
+    partial_exit_enabled: false
+    # partial_exit_1:
+    #   trigger: "profit > 0.05"                     # 盈利 > 5%
+    #   exit_pct: 0.50                              # 出場 50% 倉位
+    #   lock_profit: true
+    # partial_exit_2:
+    #   trigger: "profit > 0.10"                     # 盈利 > 10%
+    #   exit_pct: 0.30                              # 再出场 30%
+    # partial_exit_3:
+    #   trigger: "trailing_stop"                     # 移動停損
+    #   exit_pct: 1.0                               # 清倉
+
+# =============================================================================
+# 應案例：Regime-Aware MA Cross v2
+# =============================================================================
+# 將上述格式應用於真實策略
+# =============================================================================
+
+RegimeAwareMACross_v2:
+  name: "Regime-Aware MA Cross v2"
+  version: "1.0"
+
+  indicator_calculation:
+    ma20:
+      type: "SMA"
+      price: "close"
+      period: 20
+      formula: "(C[0]+C[-1]+...+C[-19])/20"
+
+    ma50:
+      type: "SMA"
+      price: "close"
+      period: 50
+      formula: "(C[0]+C[-1]+...+C[-49])/50"
+
+    ma200:
+      type: "SMA"
+      price: "close"
+      period: 200
+      formula: "(C[0]+C[-1]+...+C[-199])/200"
+
+    rsi14:
+      type: "RSI"
+      period: 14
+      price: "close"
+      formula: "標準 RSI = 100 - 100/(1+RS)，RS = avg(gain)/avg(loss)"
+
+    momentum_7d:
+      type: "momentum"
+      period: 7
+      price: "close"
+      formula: "(close - close[-7]) / close[-7] * 100"
+      unit: "percent"
+
+    ma200_slope:
+      type: "slope_percent"
+      base_indicator: "ma200"
+      lookback: 20
+      formula: "(ma200_current - ma200[-20]) / ma200[-20] * 100"
+      threshold_bull: 0.1
+      threshold_bear: -0.1
+
+  entry:
+    long:
+      signal: "AND"
+      all_required: true
+      conditions:
+        - "MA20 CROSS_ABOVE MA50  # 金叉定義：current.MA20 > current.MA50 AND previous.MA20 <= previous.MA50"
+        - "RSI14 > 50             # RSI 在多方區（不包括等於 50）"
+        - "momentum_7d > 0.5      # 7日動量為正（不包括等於 0.5）"
+        - "close > ma200         # 收盤價在 200 日均線上方（不包括等於）"
+        - "ma200_slope > 0.1     # MA200 在 20 根 K 線內上升超過 0.1%（不包括等於）"
+      # 全部 5 個條件都必須滿足才進場
+
+    short:
+      signal: "AND"
+      all_required: true
+      conditions:
+        - "MA20 CROSS_BELOW MA50  # 死叉定義：current.MA20 < current.MA50 AND previous.MA20 >= previous.MA50"
+        - "RSI14 < 48             # RSI 在空方區（嚴格 < 48，非 < 50）"
+        - "momentum_7d < -0.5     # 7日動量為負（不包括等於 -0.5）"
+        - "close < ma200          # 收盤價在 200 日均線下方（不包括等於）"
+        - "ma200_slope < -0.1     # MA200 在 20 根 K 線內下降超過 0.1%（不包括等於）"
+
+  stop_loss:
+    type: "fixed_percent"
+    value: 0.03                                     # 進場價的 3%
+    # 多頭止損價 = 進場價格 * (1 - 0.03)
+    # 空頭止損價 = 進場價格 * (1 + 0.03)
+    trigger: "close_of_bar"                         # 當根 K 線收盤價確認低於（多）/高於（空）止損價
+    execution: "next_open"                           # 以下一根 K 線開盤價成交
+
+  take_profit:
+    type: "fixed_percent"
+    value: 0.07                                     # 進場價的 7%
+    trigger: "close_of_bar"
+    execution: "next_open"
+
+  exit_priority:
+    order:
+      - "take_profit"                               # 優先檢查止盈
+      - "stop_loss"                                 # 再檢查止損
+      - "max_holding_bars"                          # 最後檢查持倉時間
+    max_holding_bars: 15                            # 持有超過 15 根 K 線則強制出场
+    reverse_signal_immediate_exit: true             # 出現反向信號時，視為獨立的出场+進場
+
+  risk_management:
+    position_size_method: "percent_of_equity"
+    position_size_value: 1.0                        # 全倉進場（帳戶 100% 資金）
+    max_positions: 1                                # 同時最多 1 個倉位
+    allow_short: true                               # 允許做空
+    leverage: 1                                     # 無槓桿
+
+# =============================================================================
+# 格式說明：為何這個格式能確保兩邊實現一致
+# =============================================================================
+#
+# 1. 指標計算完全透明
+#    每一個指標都有獨立的定義區塊，包含：type、price、period、formula
+#    研究 Agent 不能只寫「使用 RSI」，必須寫清楚「RSI(14, close)」
+#
+# 2. 進場條件無歧義
+#    每個條件都寫清楚：「> 50」還是「>= 50」都有明確標示
+#    金叉死叉有精確定義：「CROSS_ABOVE = 當根 MA20 > MA50 AND 前根 MA20 <= MA50」
+#    AND/OR 邏輯由 all_required 欄位明確定義
+#
+# 3. 止損止盈類型與數值分開
+#    type: "fixed_percent" / "atr_multiple" / "trailing_stop" 明確區分
+#    不會再發生「ATR 追蹤停損」被理解成「固定 2% 止損」的問題
+#
+# 4. 觸發與成交分開
+#    trigger（什麼時候檢查）和 execution（怎麼成交）分開定義
+#    不會對「當根成交」還是「下一根成交」產生歧義
+#
+# 5. 風控規則完整
+#    倉位計算方式、槓桿、最大持倉數都有明確數值
+#    不會對「10% 倉位」是 10% 現金還是 10% 帳戶總值產生歧義
+#
+# 6. 出場優先順序明確
+#    order 陣列定義了檢查順序：先止盈還是先止損
+#    max_holding_bars 防止無限期持有
+#    reverse_signal_immediate_exit 定義是否允許反向跳動
+#
+# 7. 版本控制
+#    每個策略都有 version 欄位，方便追蹤格式變更
+#
+# 使用方式：
+# 1. 研究 Agent 完成策略設計後，填寫此 YAML 格式
+# 2. QA Agent 收到 YAML 後，獨立實作代碼
+# 3. 實作完成後，雙方用同一組歷史數據做回測對比
+# 4. 如果結果不一致，回頭檢查 YAML 是否有歧義欄位
+# 5. 修補歧義後更新 version，重新來過
+#
+# =============================================================================

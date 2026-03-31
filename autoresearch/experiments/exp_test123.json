@@ -1,0 +1,18 @@
+{
+  "experiment_id": "test123",
+  "commit_hash": "unknown",
+  "strategy_name": "MACrossoverStrategy",
+  "params": {
+    "fast_period": 10,
+    "slow_period": 30
+  },
+  "metrics": {},
+  "status": "crash",
+  "description": "💥 崩潰: RuntimeError: asyncio.run() cannot be called from a running event loop",
+  "timestamp": "2026-03-26T16:05:51.173146",
+  "duration_seconds": 0.62,
+  "backtest_period": {
+    "start": "2024-01-01",
+    "end": "2024-06-01"
+  }
+}

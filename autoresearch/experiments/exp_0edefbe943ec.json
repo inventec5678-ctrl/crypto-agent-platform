@@ -1,0 +1,18 @@
+{
+  "experiment_id": "0edefbe943ec",
+  "commit_hash": "unknown",
+  "strategy_name": "BBBreakoutStrategy",
+  "params": {
+    "period": 10,
+    "std_dev": 2.2761437052026148
+  },
+  "metrics": {},
+  "status": "crash",
+  "description": "💥 崩潰: KeyError: 'close_time'",
+  "timestamp": "2026-03-26T15:57:54.850635",
+  "duration_seconds": 0.11,
+  "backtest_period": {
+    "start": "2024-01-01",
+    "end": "2024-12-31"
+  }
+}

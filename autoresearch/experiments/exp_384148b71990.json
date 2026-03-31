@@ -1,0 +1,18 @@
+{
+  "experiment_id": "384148b71990",
+  "commit_hash": "unknown",
+  "strategy_name": "BBBreakoutStrategy",
+  "params": {
+    "period": 10,
+    "std_dev": 2.4064395053502494
+  },
+  "metrics": {},
+  "status": "crash",
+  "description": "💥 崩潰: ValueError: too many values to unpack (expected 2)",
+  "timestamp": "2026-03-26T16:55:37.793264",
+  "duration_seconds": 0.0,
+  "backtest_period": {
+    "start": "2024-01-01",
+    "end": "2024-06-01"
+  }
+}

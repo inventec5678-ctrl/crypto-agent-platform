@@ -1,0 +1,27 @@
+{
+  "experiment_id": "1b88f95d2172",
+  "commit_hash": "unknown",
+  "strategy_name": "VolumeStrategyWrapper",
+  "params": {
+    "volume_threshold": 2.311545582094438,
+    "trend_threshold": 1.199327517851187
+  },
+  "metrics": {
+    "sharpe_ratio": 0.0,
+    "max_drawdown_pct": 0.0,
+    "win_rate": 0.0,
+    "total_return_pct": 0.0,
+    "profit_factor": 0.0,
+    "total_trades": 0,
+    "volatility": 0,
+    "sortino_ratio": 0
+  },
+  "status": "crash",
+  "description": "💥 崩潰",
+  "timestamp": "2026-03-27T00:15:19.647689",
+  "duration_seconds": 92.1,
+  "backtest_period": {
+    "start": "2017-01-01",
+    "end": "2026-12-31"
+  }
+}

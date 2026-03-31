@@ -1,0 +1,19 @@
+# 測試依賴
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+
+# 模擬庫
+requests-mock>=1.11.0
+httpretty>=1.2.0
+
+# 异步支持
+aiohttp>=3.8.0
+websockets>=10.4
+
+# 代碼質量
+flake8>=6.0.0
+black>=23.0.0
+mypy>=1.4.0
+bandit>=1.7.0

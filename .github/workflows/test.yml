@@ -1,0 +1,109 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+            
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio pytest-cov pytest-mock
+          pip install aiohttp requests websockets
+          
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ \
+            --verbose \
+            --cov=tests \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-fail-under=70
+            
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+          
+      - name: Run specific test suites
+        run: |
+          echo "=== Strategy Tests ==="
+          pytest tests/test_strategies.py -v
+          
+          echo "=== AI Analyst Tests ==="
+          pytest tests/test_ai_analyst.py -v
+          
+          echo "=== Binance Client Tests ==="
+          pytest tests/test_binance_client.py -v
+          
+          echo "=== Notification Tests ==="
+          pytest tests/test_notification.py -v
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          
+      - name: Install linting tools
+        run: |
+          pip install flake8 black mypy
+          
+      - name: Run flake8
+        run: |
+          flake8 tests/ --max-line-length=120 --ignore=E501,W503
+          
+      - name: Run black check
+        run: |
+          black --check tests/
+
+  security:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          
+      - name: Install security tools
+        run: |
+          pip install bandit safety
+          
+      - name: Run bandit security check
+        run: |
+          bandit -r tests/ -f json -o bandit_report.json || true
+          
+      - name: Check safety
+        run: |
+          safety check || true

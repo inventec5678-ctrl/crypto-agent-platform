@@ -1,0 +1,47 @@
+# 回測系統設定檔
+# 位置: crypto-agent-platform/backtest/backtest_config.yaml
+
+backtest:
+  # 回測時間範圍
+  start_date: "2024-01-01"
+  end_date: "2024-12-31"
+  
+  # 初始資金 (USDT)
+  initial_capital: 10000.0
+  
+  # 交易費用 (Maker/Laker 以bps為單位)
+  maker_fee: 0.02  # 0.02% = 2 bps
+  taker_fee: 0.04  # 0.04% = 4 bps
+  
+  # 資金费率 (借用槓桿時)
+  interest_rate: 0.001
+  
+  # 滑點 (以bps為單位)
+  slippage: 1.0  # 1 bps
+
+# 數據源設定
+data_source:
+  exchange: "binance"
+  timeframe: "1h"
+  symbols: ["BTCUSDT", "ETHUSDT"]
+  
+# 風險管理設定
+risk_management:
+  max_position_size: 0.2  # 最大部位不超過帳戶20%
+  max_drawdown_limit: 0.15  # 最大回撤15%停止交易
+  stop_loss: 0.02  # 2% 止損
+  take_profit: 0.05  # 5% 止盈
+
+# 優化設定
+optimization:
+  method: "grid_search"  # grid_search | walk_forward
+  train_ratio: 0.7
+  n_windows: 5  # Walk-Forward 視窗數量
+  metric: "sharpe_ratio"  # 優化目標
+
+# 輸出設定
+output:
+  save_trades: true
+  save_equity_curve: true
+  generate_report: true
+  report_dir: "reports"

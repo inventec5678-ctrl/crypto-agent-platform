@@ -1,0 +1,2 @@
+# Whale Tracker dependencies
+# (只依賴 Python 標準庫，不需要額外套件)

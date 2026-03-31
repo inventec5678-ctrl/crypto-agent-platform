@@ -1,0 +1,19 @@
+{
+  "experiment_id": "ada9c4e3e232",
+  "commit_hash": "unknown",
+  "strategy_name": "RSIReversalStrategy",
+  "params": {
+    "period": 10,
+    "oversold": 18.89294102325486,
+    "overbought": 69.13016903710569
+  },
+  "metrics": {},
+  "status": "crash",
+  "description": "💥 崩潰: KeyError: 'close_time'",
+  "timestamp": "2026-03-26T15:55:24.087383",
+  "duration_seconds": 0.14,
+  "backtest_period": {
+    "start": "2024-01-01",
+    "end": "2024-12-31"
+  }
+}

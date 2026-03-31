@@ -1,0 +1,27 @@
+{
+  "experiment_id": "e97c03e16107",
+  "commit_hash": "unknown",
+  "strategy_name": "BBBreakoutStrategy",
+  "params": {
+    "period": 25,
+    "std_dev": 1.3317276596452536
+  },
+  "metrics": {
+    "sharpe_ratio": -16.20024241848501,
+    "max_drawdown_pct": 1.7721757883612916,
+    "win_rate": 0.0,
+    "total_return_pct": -1.7721757883612916,
+    "profit_factor": 0.0,
+    "total_trades": 89,
+    "volatility": -16.20024241848501,
+    "sortino_ratio": -16.20024241848501
+  },
+  "status": "discard",
+  "description": "❌ 放棄: 夏普值過低 (-16.200)",
+  "timestamp": "2026-03-27T00:03:59.902536",
+  "duration_seconds": 94.07,
+  "backtest_period": {
+    "start": "2017-01-01",
+    "end": "2026-12-31"
+  }
+}

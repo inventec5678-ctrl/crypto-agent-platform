@@ -1,0 +1,19 @@
+{
+  "experiment_id": "d3c28c1e6ba2",
+  "commit_hash": "unknown",
+  "strategy_name": "RSIReversalStrategy",
+  "params": {
+    "period": 17,
+    "oversold": 32.01216881337899,
+    "overbought": 61.17588551368467
+  },
+  "metrics": {},
+  "status": "crash",
+  "description": "💥 崩潰: ValueError: too many values to unpack (expected 2)",
+  "timestamp": "2026-03-26T16:55:47.818058",
+  "duration_seconds": 0.0,
+  "backtest_period": {
+    "start": "2024-01-01",
+    "end": "2024-06-01"
+  }
+}

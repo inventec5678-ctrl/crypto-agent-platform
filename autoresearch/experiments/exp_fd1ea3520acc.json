@@ -1,0 +1,18 @@
+{
+  "experiment_id": "fd1ea3520acc",
+  "commit_hash": "unknown",
+  "strategy_name": "MACrossoverStrategy",
+  "params": {
+    "fast_period": 10,
+    "slow_period": 30
+  },
+  "metrics": {},
+  "status": "crash",
+  "description": "💥 崩潰: KeyError: 'close_time'",
+  "timestamp": "2026-03-26T13:45:46.669320",
+  "duration_seconds": 0.16,
+  "backtest_period": {
+    "start": "2024-01-01",
+    "end": "2024-12-31"
+  }
+}

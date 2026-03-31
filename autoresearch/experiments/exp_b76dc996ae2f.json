@@ -1,0 +1,30 @@
+{
+  "experiment_id": "b76dc996ae2f",
+  "commit_hash": "unknown",
+  "strategy_name": "VolumeBreakoutStrategy",
+  "params": {
+    "volume_ma_period": 5,
+    "volume_multiplier": 1.949407315489291,
+    "trend_period": 2,
+    "stop_loss_atr": 3.88591782233013,
+    "take_profit_atr": 5.1739348131775795
+  },
+  "metrics": {
+    "sharpe_ratio": 0.0,
+    "max_drawdown_pct": 0.0,
+    "win_rate": 0.0,
+    "total_return_pct": 0.0,
+    "profit_factor": 0.0,
+    "total_trades": 0,
+    "volatility": 0,
+    "sortino_ratio": 0
+  },
+  "status": "crash",
+  "description": "💥 崩潰",
+  "timestamp": "2026-03-26T23:39:17.355404",
+  "duration_seconds": 106.54,
+  "backtest_period": {
+    "start": "2017-01-01",
+    "end": "2026-12-31"
+  }
+}

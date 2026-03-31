@@ -1,0 +1,34 @@
+[
+  {
+    "factor_id": "Regime_MA_Cross_v1",
+    "name": "Regime-Aware MA Cross",
+    "type": "trend",
+    "entry": {
+      "long": {
+        "golden_cross": true,
+        "rsi_above_55": true,
+        "momentum_7d_above_0.5pct": true,
+        "price_above_ma200": true,
+        "regime_bull": true
+      },
+      "short": {
+        "death_cross": true,
+        "rsi_below_45": true,
+        "momentum_7d_below_minus0.5pct": true,
+        "price_below_ma200": true,
+        "regime_bear": true
+      }
+    },
+    "stop_loss": "3%",
+    "take_profit": "5%",
+    "max_holding": "15 bars",
+    "source": "auto_research",
+    "status": "verified",
+    "metrics": {
+      "win_rate": 71.43,
+      "profit_factor": 2.66,
+      "max_drawdown": 3.69,
+      "sharpe": 3.13
+    }
+  }
+]

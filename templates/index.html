@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>加密貨幣量化交易平台</title>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0D1117; --bg-secondary: #161B22; --bg-card: #21262D;
+            --text-primary: #E6EDF3; --text-secondary: #8B949E;
+            --accent-green: #10B981; --accent-red: #EF4444; --accent-blue: #3B82F6;
+            --accent-yellow: #F59E0B; --accent-orange: #F97316; --border-color: #30363D;
+            --skeleton-base: #21262D; --skeleton-shine: #30363D;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+        
+        /* ─── Skeleton Animation ─── */
+        @keyframes skeleton-shine {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .skeleton {
+            background: linear-gradient(90deg, var(--skeleton-base) 25%, var(--skeleton-shine) 50%, var(--skeleton-base) 75%);
+            background-size: 200% 100%;
+            animation: skeleton-shine 1.5s infinite;
+            border-radius: 6px;
+        }
+        .skeleton-text { height: 14px; margin-bottom: 8px; }
+        .skeleton-title { height: 24px; width: 60%; margin-bottom: 12px; }
+        .skeleton-circle { border-radius: 50%; }
+        
+        /* ─── Pull to Refresh ─── */
+        .pull-container { overflow: hidden; position: relative; }
+        .pull-indicator {
+            position: absolute; top: -50px; left: 0; right: 0; height: 50px;
+            display: flex; align-items: center; justify-content: center;
+            transition: top 0.3s; z-index: 100;
+        }
+        .pull-indicator.pulling { top: 0; }
+        .pull-indicator .spinner {
+            width: 24px; height: 24px; border: 3px solid var(--border-color);
+            border-top-color: var(--accent-blue); border-radius: 50%;
+            animation: spin 0.8s linear infinite; display: none;
+        }
+        .pull-indicator.refreshing .spinner { display: block; }
+        .pull-indicator.refreshing .arrow { display: none; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* ─── Header ─── */
+        header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px 20px; background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky; top: 0; z-index: 50;
+        }
+        .logo { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .logo-icon { font-size: 24px; }
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        .last-update-badge {
+            font-size: 11px; color: var(--text-secondary);
+            display: flex; align-items: center; gap: 4px;
+            padding: 4px 10px; background: var(--bg-card);
+            border-radius: 12px; border: 1px solid var(--border-color);
+        }
+        .last-update-badge .dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--accent-green);
+        }
+        .last-update-badge.stale .dot { background: var(--accent-yellow); }
+        .last-update-badge.error .dot { background: var(--accent-red); }
+        .last-update-badge.loading .dot { animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        .menu-btn {
+            background: var(--bg-card); border: 1px solid var(--border-color);
+            color: var(--text-primary); padding: 8px 12px; border-radius: 8px;
+            cursor: pointer; font-size: 18px;
+        }
+        
+        /* ─── Mobile Tabs ─── */
+        .bottom-nav {
+            display: none; position: fixed; bottom: 0; left: 0; right: 0;
+            background: var(--bg-secondary); border-top: 1px solid var(--border-color);
+            padding: 8px 0; z-index: 50;
+        }
+        @media (max-width: 768px) {
+            .bottom-nav { display: flex; justify-content: space-around; }
+            body { padding-bottom: 70px; }
+        }
+        .nav-item {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 4px; padding: 6px 12px; border-radius: 8px;
+            color: var(--text-secondary); font-size: 11px; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .nav-item.active { color: var(--accent-blue); background: rgba(59,130,246,0.1); }
+        .nav-item-icon { font-size: 20px; }
+        
+        /* ─── Container ─── */
+        .container { max-width: 1200px; margin: 0 auto; padding: 16px 16px 30px; }
+        
+        /* ─── Hero Panel - BTC Price ─── */
+        .hero-panel {
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-card) 100%);
+            border: 1px solid var(--border-color); border-radius: 16px;
+            padding: 20px; margin-bottom: 16px;
+            position: relative; overflow: hidden;
+        }
+        .hero-panel::before {
+            content: ''; position: absolute; top: 0; right: 0;
+            width: 150px; height: 150px;
+            background: radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .hero-coins-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+        }
+        .hero-coin-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 14px 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .hero-coin-card:hover {
+            border-color: var(--accent-blue);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .hero-coin-card.long { border-left: 4px solid var(--accent-green); }
+        .hero-coin-card.short { border-left: 4px solid var(--accent-red); }
+        .hero-coin-card.flat { border-left: 4px solid var(--text-secondary); }
+        .hero-coin-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .hero-coin-name { font-size: 16px; font-weight: 700; }
+        .hero-coin-signal { font-size: 12px; padding: 3px 10px; border-radius: 6px; font-weight: 700; }
+        .hero-coin-signal.long { background: var(--accent-green); color: white; }
+        .hero-coin-signal.short { background: var(--accent-red); color: white; }
+        .hero-coin-signal.flat { background: var(--text-secondary); color: white; }
+        .hero-coin-price-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .hero-coin-price-label { font-size: 11px; color: var(--text-secondary); }
+        .hero-coin-price-val { font-size: 14px; font-weight: 600; }
+        .hero-coin-wr { font-size: 12px; color: var(--accent-blue); font-weight: 600; margin-bottom: 8px; }
+        .hero-coin-tp-sl { display: flex; justify-content: space-between; font-size: 11px; padding-top: 8px; border-top: 1px solid var(--border-color); }
+        .hero-coin-tp-sl .tp { color: var(--accent-green); font-weight: 600; }
+        .hero-coin-tp-sl .sl { color: var(--accent-red); font-weight: 600; }
+        
+        /* ─── Coin Detail Modal ─── */
+        .modal-signal { padding: 4px 12px; border-radius: 6px; font-weight: 700; font-size: 13px; }
+        .modal-signal.long { background: var(--accent-green); color: white; }
+        .modal-signal.short { background: var(--accent-red); color: white; }
+        .modal-signal.flat { background: var(--text-secondary); color: white; }
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center;
+            padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-content {
+            background: var(--bg-secondary); border-radius: 16px; padding: 24px;
+            max-width: 500px; width: 100%; max-height: 80vh; overflow-y: auto;
+            border: 1px solid var(--border-color);
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-title { font-size: 20px; font-weight: 700; }
+        .modal-close { background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer; }
+        .modal-close:hover { color: var(--text-primary); }
+        .modal-section { margin-bottom: 16px; padding: 12px; background: var(--bg-card); border-radius: 8px; }
+        .modal-section-title { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; }
+        .modal-metric { display: flex; justify-content: space-between; margin-bottom: 6px; }
+        .modal-metric-label { color: var(--text-secondary); }
+        .modal-metric-value { font-weight: 600; }
+        .modal-factor { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+        .modal-factor:last-child { border-bottom: none; }
+        .modal-factor.active { color: var(--accent-green); }
+        .modal-factor.inactive { color: var(--text-secondary); text-decoration: line-through; }
+        .modal-factor-name { font-size: 13px; }
+        .modal-factor-stats { font-size: 11px; }
+        .modal-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-top: 8px; }
+        .hero-symbol { font-size: 14px; color: var(--text-secondary); margin-bottom: 8px; }
+        .hero-price { font-size: 42px; font-weight: 800; margin-bottom: 8px; letter-spacing: -1px; }
+        .hero-meta { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+        .hero-change { font-size: 16px; font-weight: 600; padding: 4px 12px; border-radius: 8px; }
+        .hero-change.positive { color: var(--accent-green); background: rgba(16,185,129,0.15); }
+        .hero-change.negative { color: var(--accent-red); background: rgba(239,68,68,0.15); }
+        .hero-fear { font-size: 13px; color: var(--text-secondary); }
+        .hero-fear span { font-weight: 600; }
+        .hero-actions { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .btn {
+            padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 600;
+            cursor: pointer; border: none; transition: all 0.2s;
+        }
+        .btn-primary { background: var(--accent-green); color: white; }
+        .btn-primary:hover { background: #0ea572; transform: translateY(-1px); }
+        .btn-secondary { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: var(--bg-secondary); }
+        
+        /* ─── Multi-Factor Panel ─── */
+        #multifactor-panel { background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(16,185,129,0.1)); }
+        .mf-loading { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); padding: 12px; }
+        .mf-context { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin-bottom: 12px; }
+        .mf-ctx-item { background: var(--bg-secondary); padding: 8px 12px; border-radius: 6px; text-align: center; }
+        .mf-ctx-label { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; }
+        .mf-ctx-value { font-size: 14px; font-weight: 600; margin-top: 2px; }
+        .mf-ctx-value.bull { color: var(--accent-green); }
+        .mf-ctx-value.bear { color: var(--accent-red); }
+        .mf-ctx-value.sideways { color: var(--accent-yellow); }
+        .mf-factors { display: flex; flex-wrap: wrap; gap: 6px; }
+        .mf-factor { 
+            padding: 4px 10px; border-radius: 12px; font-size: 12px; 
+            background: var(--bg-secondary); border: 1px solid var(--border-color);
+        }
+        .mf-factor.active { 
+            background: rgba(16,185,129,0.2); border-color: var(--accent-green);
+            color: var(--accent-green);
+        }
+        .mf-factor .wr { font-weight: 600; }
+        .signal-badge {
+            padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;
+            background: rgba(16,185,129,0.2); color: var(--accent-green);
+        }
+        .signal-badge.neutral { background: rgba(245,158,11,0.2); color: var(--accent-yellow); }
+        .signal-badge.weak { background: rgba(107,114,128,0.2); color: var(--text-secondary); }
+
+        /* ─── Coin Selector ─── */
+        .coin-selector {
+            display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto;
+            padding-bottom: 8px; -webkit-overflow-scrolling: touch;
+        }
+        .coin-chip {
+            padding: 8px 14px; border-radius: 20px; font-size: 13px; font-weight: 600;
+            background: var(--bg-card); border: 1px solid var(--border-color);
+            color: var(--text-secondary); cursor: pointer; white-space: nowrap;
+            transition: all 0.2s;
+        }
+        .coin-chip.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+        .coin-chip:hover:not(.active) { border-color: var(--accent-blue); color: var(--text-primary); }
+        
+        /* ─── Grid Layout ─── */
+        .grid { display: grid; gap: 16px; }
+        @media (min-width: 768px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (min-width: 1024px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+        .grid-full { grid-column: 1 / -1; }
+        
+        /* ─── Card ─── */
+        .card {
+            background: var(--bg-card); border: 1px solid var(--border-color);
+            border-radius: 12px; padding: 16px;
+        }
+        .card-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 14px;
+        }
+        .card-title { font-size: 13px; color: var(--text-secondary); font-weight: 600; }
+        .card-action { font-size: 12px; color: var(--accent-blue); cursor: pointer; }
+        
+        /* ─── Signal Panel ─── */
+        .signal-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px; background: var(--bg-secondary); border-radius: 10px; margin-bottom: 10px;
+        }
+        .signal-item:last-child { margin-bottom: 0; }
+        .signal-icon { font-size: 28px; }
+        .signal-info { flex: 1; }
+        .signal-symbol { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+        .signal-desc { font-size: 12px; color: var(--text-secondary); }
+        .signal-confidence {
+            text-align: center; min-width: 50px;
+        }
+        .confidence-num { font-size: 20px; font-weight: 800; }
+        .confidence-label { font-size: 10px; color: var(--text-secondary); }
+        .signal-waiting {
+            text-align: center; padding: 24px; color: var(--text-secondary);
+            font-size: 14px;
+        }
+        .signal-waiting .spinner-small {
+            width: 20px; height: 20px; border: 2px solid var(--border-color);
+            border-top-color: var(--accent-blue); border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin: 0 auto 10px;
+        }
+        
+        /* ─── Coin Grid ─── */
+        .mini-coin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+        .mini-coin-card {
+            background: var(--bg-secondary); border-radius: 10px; padding: 12px;
+            cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden;
+        }
+        .mini-coin-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .mini-coin-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .mini-coin-name { font-size: 14px; font-weight: 700; }
+        .mini-coin-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; }
+        .mini-coin-badge.buy { background: rgba(16,185,129,0.2); color: var(--accent-green); }
+        .mini-coin-badge.sell { background: rgba(239,68,68,0.2); color: var(--accent-red); }
+        .mini-coin-badge.hold { background: rgba(139,148,158,0.2); color: var(--text-secondary); }
+        .mini-coin-price { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+        .mini-coin-change { font-size: 12px; font-weight: 600; }
+        .mini-coin-change.positive { color: var(--accent-green); }
+        .mini-coin-change.negative { color: var(--accent-red); }
+        .mini-coin-anomaly { position:absolute; top:6px; right:8px; font-size:13px; }
+        
+        /* ─── Fear & Greed ─── */
+        .fear-greed-display { text-align: center; }
+        .fg-emoji { font-size: 48px; margin-bottom: 8px; }
+        .fg-value { font-size: 36px; font-weight: 800; margin-bottom: 4px; }
+        .fg-label { font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; }
+        .fg-bar { height: 8px; background: linear-gradient(to right, var(--accent-red), var(--accent-yellow), var(--accent-green)); border-radius: 4px; position: relative; }
+        .fg-indicator {
+            position: absolute; top: -4px; width: 16px; height: 16px;
+            background: white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            transform: translateX(-50%); transition: left 0.5s ease;
+        }
+        
+        /* ─── Agent Status ─── */
+        .agent-mini-list { display: flex; flex-wrap: wrap; gap: 8px; }
+        .agent-chip {
+            display: flex; align-items: center; gap: 6px;
+            padding: 6px 12px; background: var(--bg-secondary); border-radius: 20px; font-size: 12px;
+        }
+        .agent-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .agent-dot.green { background: var(--accent-green); }
+        .agent-dot.yellow { background: var(--accent-yellow); }
+        .agent-dot.gray { background: var(--text-secondary); }
+        
+        /* ─── Ranking Preview ─── */
+        .rank-preview { display: flex; flex-direction: column; gap: 8px; }
+        .rank-row {
+            display: flex; align-items: center; gap: 10px;
+            padding: 8px 10px; background: var(--bg-secondary); border-radius: 8px;
+        }
+        .rank-num { font-size: 12px; font-weight: 700; width: 20px; text-align: center; }
+        .rank-1 { color: #FFD700; }
+        .rank-2 { color: #C0C0C0; }
+        .rank-3 { color: #CD7F32; }
+        .rank-name { flex: 1; font-size: 13px; font-weight: 500; }
+        .rank-score { font-size: 13px; font-weight: 700; }
+        
+        /* ─── Error State ─── */
+        .error-state {
+            text-align: center; padding: 20px; color: var(--text-secondary);
+        }
+        .error-state .icon { font-size: 32px; margin-bottom: 8px; }
+        .stale-data-notice {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 11px; color: var(--accent-yellow); margin-top: 8px;
+        }
+        .articles-list { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-color); }
+        .article-item { padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+        .article-item:last-child { border-bottom: none; }
+        .article-title { font-size: 13px; font-weight: 500; margin-bottom: 4px; line-height: 1.4; }
+        .article-title a { color: var(--text-primary); text-decoration: none; }
+        .article-title a:hover { text-decoration: underline; }
+        .article-meta { font-size: 11px; color: var(--text-secondary); }
+        .article-sentiment { font-weight: 600; }
+        .article-sentiment.positive { color: var(--accent-green); }
+        .article-sentiment.neutral { color: var(--accent-yellow); }
+        .article-sentiment.negative { color: var(--accent-red); }
+        
+        /* ─── Quick Stats ─── */
+        .quick-stats { display: flex; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); }
+        .stat-item { flex: 1; text-align: center; }
+        .stat-value { font-size: 16px; font-weight: 700; }
+        .stat-label { font-size: 10px; color: var(--text-secondary); }
+        
+        /* ─── Responsive tweaks ─── */
+        @media (max-width: 768px) {
+            .hero-price { font-size: 32px; }
+            .container { padding: 12px 12px 80px; }
+            .grid { gap: 12px; }
+        }
+        
+        /* ─── Time Frame Selector ─── */
+        .tf-selector {
+            display: flex; gap: 4px; margin-bottom: 10px;
+        }
+        .tf-btn {
+            padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;
+            background: var(--bg-secondary); border: 1px solid var(--border-color);
+            color: var(--text-secondary); cursor: pointer; transition: all 0.2s;
+        }
+        .tf-btn.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+        .tf-btn:hover:not(.active) { border-color: var(--accent-blue); color: var(--text-primary); }
+        
+        /* ─── Mini Chart Container ─── */
+        .coin-chart-wrap { margin-bottom: 8px; position: relative; }
+        .coin-chart {
+            width: 100%; height: 70px;
+            border-radius: 6px; overflow: hidden;
+            background: var(--bg-secondary);
+        }
+        .chart-loading {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            display: flex; align-items: center; justify-content: center;
+            background: var(--bg-secondary); border-radius: 6px;
+            font-size: 11px; color: var(--text-secondary);
+        }
+        .chart-loading .spinner-xs {
+            width: 14px; height: 14px; border: 2px solid var(--border-color);
+            border-top-color: var(--accent-blue); border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin-right: 6px;
+        }
+        
+        /* ─── Hero Coin Card with Chart ─── */
+        .hero-coin-card { padding: 12px; }
+        .hero-coin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .hero-coin-header .symbol { font-size: 15px; font-weight: 700; }
+        .hero-coin-header .price { font-size: 14px; font-weight: 600; }
+        .hero-coin-signal {
+            font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: 700;
+        }
+        .hero-coin-signal.long { background: var(--accent-green); color: white; }
+        .hero-coin-signal.short { background: var(--accent-red); color: white; }
+        .hero-coin-signal.flat { background: var(--text-secondary); color: white; }
+        
+        /* ─── Card Entry Info ─── */
+        .hero-coin-entry {
+            display: flex; justify-content: space-between; font-size: 11px;
+            padding-top: 6px; border-top: 1px solid var(--border-color); margin-top: 4px;
+        }
+        .hero-coin-entry .entry { color: var(--accent-blue); font-weight: 600; }
+        .hero-coin-entry .tp { color: var(--accent-green); font-weight: 600; }
+        .hero-coin-entry .sl { color: var(--accent-red); font-weight: 600; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">
+        <span class="logo-icon">🚀</span>
+        <span>加密貨幣量化平台</span>
+    </div>
+    <div class="header-right">
+        <div class="last-update-badge loading" id="update-badge">
+            <span class="dot"></span>
+            <span id="update-time">連接中...</span>
+        </div>
+        <button class="menu-btn" onclick="toggleMenu()">☰</button>
+    </div>
+</header>
+
+<!-- Pull to Refresh Indicator -->
+<div class="pull-indicator" id="pull-indicator">
+    <div class="arrow">↓ 下拉刷新</div>
+    <div class="spinner"></div>
+</div>
+
+<div class="container" id="main-content">
+    
+    <!-- Hero: Top 20 Coins Grid -->
+    <div class="hero-panel" id="hero-panel">
+        <div class="hero-coins-grid" id="hero-coins-grid">
+            <div class="skeleton skeleton-text" style="grid-column:1/-1;height:20px;width:120px;margin-bottom:8px;"></div>
+            <div class="skeleton" style="height:52px;border-radius:8px;"></div>
+            <div class="skeleton" style="height:52px;border-radius:8px;"></div>
+            <div class="skeleton" style="height:52px;border-radius:8px;"></div>
+            <div class="skeleton" style="height:52px;border-radius:8px;"></div>
+            <div class="skeleton" style="height:52px;border-radius:8px;"></div>
+            <div class="skeleton" style="height:52px;border-radius:8px;"></div>
+            <div class="skeleton" style="height:52px;border-radius:8px;"></div>
+        </div>
+    </div>
+    
+    <!-- Signals Panel -->
+    <div class="card grid-full">
+        <div class="card-header">
+            <span class="card-title">🚀 進場訊號</span>
+            <span class="card-action" onclick="showAllSignals()">查看全部</span>
+        </div>
+        <div id="signals-container">
+            <div class="signal-waiting">
+                <div class="spinner-small"></div>
+                等待下一個訊號...
+            </div>
+        </div>
+    </div>
+    
+    <!-- Grid: 2 columns on tablet, 3 on desktop -->
+    <div class="grid">
+        
+        <!-- Fear & Greed -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">😀 市場情緒</span>
+            </div>
+            <div class="fear-greed-display" id="fear-greed-display">
+                <div class="fg-emoji skeleton" style="width:48px;height:48px;margin:0 auto 8px;"></div>
+                <div class="fg-value skeleton" style="width:80px;height:36px;margin:0 auto 4px;"></div>
+                <div class="fg-label skeleton" style="width:60px;margin:0 auto 12px;"></div>
+                <div class="fg-bar skeleton" style="height:8px;"></div>
+            </div>
+            <div class="quick-stats" id="quick-stats">
+                <div class="stat-item">
+                    <div class="stat-value skeleton" style="width:40px;height:16px;margin:0 auto;"></div>
+                    <div class="stat-label">討論量</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value skeleton" style="width:40px;height:16px;margin:0 auto;"></div>
+                    <div class="stat-label">Twitter</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value skeleton" style="width:40px;height:16px;margin:0 auto;"></div>
+                    <div class="stat-label">Reddit</div>
+                </div>
+            </div>
+            <div class="articles-list" id="articles-list">
+                <div class="skeleton skeleton-text" style="width:80%;"></div>
+                <div class="skeleton skeleton-text" style="width:60%;"></div>
+            </div>
+        </div>
+        
+        <!-- Strategy Ranking -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">🏆 策略排行</span>
+                <span class="card-action" onclick="showRanking()">詳細</span>
+            </div>
+            <div class="rank-preview" id="rank-preview">
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text"></div>
+            </div>
+        </div>
+        
+
+        
+    </div>
+    
+</div>
+
+<!-- Bottom Navigation (Mobile) -->
+<div class="bottom-nav">
+    <div class="nav-item active" onclick="navTo('dashboard')">
+        <span class="nav-item-icon">📊</span>
+        <span>行情</span>
+    </div>
+    <div class="nav-item" onclick="navTo('signals')">
+        <span class="nav-item-icon">🔔</span>
+        <span>訊號</span>
+    </div>
+    <div class="nav-item" onclick="navTo('ranking')">
+        <span class="nav-item-icon">🏆</span>
+        <span>排行</span>
+    </div>
+    <div class="nav-item" onclick="navTo('sentiment')">
+        <span class="nav-item-icon">💬</span>
+        <span>情緒</span>
+    </div>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+let currentCoin = 'BTCUSDT';
+let lastSuccessfulUpdate = null;
+let cachedData = {
+    sentiment: null,
+    signals: [],
+    rankings: []
+};
+
+// ─── Update Badge ───
+function updateBadge(status, timeStr) {
+    const badge = document.getElementById('update-badge');
+    const timeEl = document.getElementById('update-time');
+    badge.className = 'last-update-badge ' + status;
+    timeEl.textContent = timeStr;
+}
+
+// ─── Fetch with Cache & Error Handling ───
+async function fetchAPI(endpoint, cacheKey) {
+    try {
+        const r = await fetch(API_BASE + endpoint);
+        if (!r.ok) throw new Error('API error ' + r.status);
+        const data = await r.json();
+        if (cacheKey) cachedData[cacheKey] = data;
+        return data;
+    } catch (e) {
+        console.warn('Fetch failed for', endpoint, e.message);
+        return cachedData[cacheKey] || null; // Return cached or null
+    }
+}
+
+// ─── Pull to Refresh ───
+let touchStartY = 0;
+let touchEndY = 0;
+const pullIndicator = document.getElementById('pull-indicator');
+
+document.addEventListener('touchstart', e => { touchStartY = e.changedTouches[0].screenY; }, { passive: true });
+document.addEventListener('touchend', e => {
+    touchEndY = e.changedTouches[0].screenY;
+    if (touchStartY < 50 && touchEndY - touchStartY > 100) {
+        pullIndicator.classList.add('refreshing');
+        updateBadge('loading', '刷新中...');
+        refreshAll().then(() => {
+            pullIndicator.classList.remove('refreshing');
+        });
+    }
+}, { passive: true });
+
+window.addEventListener('scroll', () => {
+    const scrollY = window.scrollY;
+    if (scrollY < 50) {
+        pullIndicator.style.top = (-50 + scrollY) + 'px';
+        pullIndicator.classList.add('pulling');
+    } else {
+        pullIndicator.style.top = '0px';
+    }
+    if (scrollY > 50) pullIndicator.classList.remove('pulling');
+});
+
+// Cache for coin detail modal
+let coinDetailCache = {};
+
+async function refreshHero() {
+    const d = await fetchAPI('/api/multifactor/all', 'multifactor');
+    const grid = document.getElementById('hero-coins-grid');
+    
+    if (d && d.signals && d.signals.length > 0) {
+        // Cache all signals for modal
+        d.signals.forEach(s => { coinDetailCache[s.symbol] = s; });
+        
+        grid.innerHTML = d.signals.slice(0, 20).map(s => {
+            const price = parseFloat(s.market_context?.price || 0);
+            const priceStr = price.toFixed(price < 1 ? 4 : 2);
+            const sym = s.symbol;
+            
+            // 只顯示有勝率>=50%策略的信號
+            const activeHighWrFactors = (s.signal?.details || []).filter(f => f.active && f.win_rate >= 50);
+            const hasQualifyingSignal = activeHighWrFactors.length > 0;
+            
+            // 判斷信號方向
+            const signalData = s.signal?.signal || 'FLAT';
+            const isLong = signalData === 'LONG';
+            const isShort = signalData === 'SHORT';
+            const isFlat = !isLong && !isShort;
+            
+            const avgEntry = parseFloat(s.signal?.avg_entry_price || price);
+            const atrPct = s.market_context?.atr_percentile || 30;
+            const atrMult = atrPct / 1000;
+            const slDist = avgEntry * atrMult;
+            const tpDist = avgEntry * atrMult * 1.5;
+            const avgWr = activeHighWrFactors.length > 0
+                ? activeHighWrFactors.reduce((sum, f) => sum + f.win_rate, 0) / activeHighWrFactors.length
+                : 0;
+            const conf = ((s.signal?.confidence || 0) * 100).toFixed(0);
+            
+            const entryStr = avgEntry.toFixed(avgEntry < 1 ? 4 : 2);
+            const tp = (avgEntry + tpDist).toFixed(avgEntry < 1 ? 4 : 2);
+            const sl = (avgEntry - slDist).toFixed(avgEntry < 1 ? 4 : 2);
+            
+            const cardClass = isLong ? 'long' : isShort ? 'short' : 'flat';
+            const signalLabel = isLong ? `🟢 買 ${conf}%` : isShort ? `🔴 賣 ${conf}%` : '⚪ 觀望';
+            const wrText = hasQualifyingSignal ? `勝率 ${avgWr.toFixed(0)}%` : '無高勝率策略';
+            
+            return `
+                <div class="hero-coin-card ${cardClass}" data-symbol="${sym}" onclick="showCoinDetail('${sym}')">
+                    <div class="hero-coin-header">
+                        <span class="symbol">${sym.replace('USDT','')}</span>
+                        <span class="hero-coin-signal ${cardClass}">${signalLabel}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                        <span style="font-size:13px;font-weight:600;">$${parseFloat(priceStr).toLocaleString()}</span>
+                        ${hasQualifyingSignal ? `<span class="tf-selector" onclick="event.stopPropagation();">
+                            <button class="tf-btn active" data-tf="1d">1D</button>
+                            <button class="tf-btn" data-tf="4h">4H</button>
+                            <button class="tf-btn" data-tf="15m">15M</button>
+                        </span>` : ''}
+                    </div>
+                    <div class="coin-chart-wrap">
+                        <div class="coin-chart" id="chart-${sym}" data-loaded="false"></div>
+                        <div class="chart-loading" id="chart-load-${sym}">
+                            <div class="spinner-xs"></div>
+                            載入中...
+                        </div>
+                    </div>
+                    <div class="hero-coin-entry">
+                        <span class="entry">進場 $${entryStr}</span>
+                        <span class="tp">TP $${tp}</span>
+                        <span class="sl">SL $${sl}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        // 延遲載入圖表（Intersection Observer 懶載入）
+        setTimeout(initLazyCharts, 300);
+        
+        lastSuccessfulUpdate = new Date();
+        updateBadge('', '更新於 ' + formatTime(lastSuccessfulUpdate));
+    }
+}
+
+async function refreshSentiment() {
+    const d = await fetchAPI('/api/sentiment/' + currentCoin.replace('USDT', ''), 'sentiment');
+    const container = document.getElementById('fear-greed-display');
+
+    if (!d || d.fear_greed_index === undefined) {
+        container.innerHTML = `
+            <div class="fg-emoji">😐</div>
+            <div class="fg-value" style="color:var(--text-secondary)">--</div>
+            <div class="fg-label">無情緒資料</div>
+            <div class="fg-bar"><div class="fg-indicator" style="left:50%"></div></div>
+        `;
+        document.getElementById('quick-stats').innerHTML = `
+            <div class="stat-item"><div class="stat-value">--</div><div class="stat-label">討論量</div></div>
+            <div class="stat-item"><div class="stat-value">--</div><div class="stat-label">Twitter</div></div>
+            <div class="stat-item"><div class="stat-value">--</div><div class="stat-label">Reddit</div></div>
+        `;
+        document.getElementById('articles-list').innerHTML = '';
+        return;
+    }
+
+    const idx = d.fear_greed_index;
+    const cfg = [
+        {min:0,max:25,emoji:'😱',label:'極度恐懼',color:'#EF4444'},
+        {min:25,max:45,emoji:'😰',label:'恐懼',color:'#F97316'},
+        {min:45,max:55,emoji:'😐',label:'中性',color:'#F59E0B'},
+        {min:55,max:75,emoji:'🙂',label:'貪婪',color:'#84CC16'},
+        {min:75,max:100,emoji:'😁',label:'極度貪婪',color:'#10B981'}
+    ];
+    const info = cfg.find(c => idx >= c.min && idx <= c.max) || cfg[2];
+
+    container.innerHTML = `
+        <div class="fg-emoji">${info.emoji}</div>
+        <div class="fg-value" style="color:${info.color}">${idx}</div>
+        <div class="fg-label">${info.label}</div>
+        <div class="fg-bar"><div class="fg-indicator" style="left:${idx}%"></div></div>
+    `;
+
+    document.getElementById('quick-stats').innerHTML = `
+        <div class="stat-item">
+            <div class="stat-value">${d.discussion_volume || '--'}</div>
+            <div class="stat-label">討論量</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">${d.twitter_posts_analyzed || 0}</div>
+            <div class="stat-label">Twitter</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">${d.reddit_posts_analyzed || 0}</div>
+            <div class="stat-label">Reddit</div>
+        </div>
+    `;
+
+    const articlesContainer = document.getElementById('articles-list');
+    const articles = d.articles || [];
+    if (articles.length > 0) {
+        articlesContainer.innerHTML = articles.slice(0, 5).map(a => {
+            const sentClass = a.sentiment >= 0.6 ? 'positive' : a.sentiment >= 0.4 ? 'neutral' : 'negative';
+            const sentLabel = a.sentiment >= 0.6 ? '🟢' : a.sentiment >= 0.4 ? '🟡' : '🔴';
+            const timeAgo = a.created_utc ? new Date(a.created_utc).toLocaleDateString('zh-TW') : '';
+            const linkHtml = a.url
+                ? '<a href="' + a.url + '" target="_blank" rel="noopener" title="點擊開啟文章">' + a.title + '</a>'
+                : '<span>' + a.title + '</span>';
+            return `<div class="article-item">
+                <div class="article-title">${linkHtml}</div>
+                <div class="article-meta">${a.source || ''} ${timeAgo ? '| ' + timeAgo : ''} <span class="article-sentiment ${sentClass}">${sentLabel} ${(a.sentiment * 100).toFixed(0)}%</span></div>
+            </div>`;
+        }).join('');
+    } else {
+        articlesContainer.innerHTML = '<div style="text-align:center;color:var(--text-secondary);font-size:12px;padding:8px 0;">暫無文章</div>';
+    }
+}
+
+async function refreshSignals() {
+    const d = await fetchAPI('/api/signals', 'signals');
+    const container = document.getElementById('signals-container');
+    
+    if (d && d.length > 0) {
+        const latest = d[d.length - 1];
+        container.innerHTML = d.slice().reverse().slice(0, 3).map(s => {
+            const isBullish = s.direction === 'LONG' || s.signal.includes('GOLDEN') || s.signal.includes('BUY');
+            const isBearish = s.signal.includes('DEATH') || s.signal.includes('SELL');
+            const icon = isBullish ? '📈' : isBearish ? '📉' : '➡️';
+            const color = isBullish ? 'var(--accent-green)' : isBearish ? 'var(--accent-red)' : 'var(--text-secondary)';
+            const stars = s.ai_confidence >= 80 ? '★★★★' : s.ai_confidence >= 60 ? '★★★' : '★★';
+            
+            return `<div class="signal-item">
+                <span class="signal-icon">${icon}</span>
+                <div class="signal-info">
+                    <div class="signal-symbol">${s.symbol}</div>
+                    <div class="signal-desc">${s.signal} · ${stars}</div>
+                </div>
+                <div class="signal-confidence">
+                    <div class="confidence-num" style="color:${color}">${s.ai_confidence.toFixed(0)}%</div>
+                    <div class="confidence-label">信心</div>
+                </div>
+            </div>`;
+        }).join('');
+    } else {
+        container.innerHTML = `<div class="signal-waiting">
+            <div class="spinner-small"></div>
+            等待下一個訊號...
+        </div>`;
+    }
+}
+
+async function refreshRankings() {
+    const d = await fetchAPI('/api/rankings', 'rankings');
+    const container = document.getElementById('rank-preview');
+    
+    if (d && d.rankings && d.rankings.length > 0) {
+        // Show all available strategies (up to 2 verified)
+        container.innerHTML = d.rankings.slice(0, 2).map((r, i) => {
+            const rank = i + 1;
+            const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : '';
+            const sColor = r.score >= 70 ? 'var(--accent-green)' : r.score >= 50 ? 'var(--accent-yellow)' : 'var(--accent-red)';
+            return `<div class="rank-row">
+                <span class="rank-num ${rankClass}">${rank}</span>
+                <span class="rank-name">${r.strategy}</span>
+                <span class="rank-score" style="color:${sColor}">${r.score.toFixed(1)}</span>
+            </div>
+            <div style="font-size:11px;color:var(--text-secondary);padding-top:4px;">
+                WR: ${r.win_rate != null ? r.win_rate.toFixed(1) : '--'}% | PF: ${r.profit_factor != null ? r.profit_factor.toFixed(2) : '--'} | DD: ${r.max_drawdown != null ? r.max_drawdown.toFixed(1) : '--'}%
+            </div>`;
+        }).join('');
+    } else {
+        container.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-secondary);">暫無已驗證策略</div>';
+    }
+}
+
+// ─── Navigation ───
+function navTo(page) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    event.target.closest('.nav-item').classList.add('active');
+    // In a real app, this would switch views
+}
+
+function toggleMenu() {
+    // Placeholder for menu
+}
+
+function showAllSignals() { /* Navigate to signals page */ }
+function showAllCoins() { /* Navigate to coins page */ }
+function showRanking() { /* Navigate to ranking page */ }
+
+// ─── Time Formatter ───
+function formatTime(date) {
+    if (!date) return '--';
+    return date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ─── Main Refresh ───
+async function refreshAll() {
+    updateBadge('loading', '載入中...');
+    
+    // Helper: timeout wrapper for promise
+    const withTimeout = (promise, ms) => {
+        return Promise.race([
+            promise,
+            new Promise(resolve => setTimeout(() => resolve(null), ms))
+        ]);
+    };
+    
+    // Run all refreshes with 8 second timeout each
+    const results = await Promise.all([
+        withTimeout(refreshHero(), 8000),
+        withTimeout(refreshSentiment(), 8000),
+        withTimeout(refreshSignals(), 8000),
+        withTimeout(refreshRankings(), 8000)
+    ]);
+
+    lastSuccessfulUpdate = new Date();
+    updateBadge('', '更新於 ' + formatTime(lastSuccessfulUpdate));
+}
+
+// ─── Auto Refresh ───
+refreshAll();
+setInterval(refreshAll, 30000);
+
+// ─── Error Handling: Show last update when API fails ───
+setInterval(() => {
+    if (lastSuccessfulUpdate) {
+        const elapsed = Math.floor((Date.now() - lastSuccessfulUpdate.getTime()) / 1000);
+        if (elapsed > 60) {
+            updateBadge('stale', '更新於 ' + formatTime(lastSuccessfulUpdate) + ' (逾期)');
+        }
+    }
+}, 10000);
+
+// ─── Lightweight Charts - K線圖表管理 ─────────────────────────────────────────
+const chartInstances = {};  // symbol -> { chart, series, currentTf }
+let chartsInitialized = false;
+
+function initLazyCharts() {
+    if (chartsInitialized) return;
+    chartsInitialized = true;
+    
+    // 使用 Intersection Observer 懶載入圖表
+    if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const chartEl = entry.target;
+                    const symbol = chartEl.id.replace('chart-', '');
+                    if (chartEl.dataset.loaded === 'false') {
+                        loadChartForSymbol(symbol, '1d');
+                        chartEl.dataset.loaded = 'true';
+                    }
+                    observer.unobserve(chartEl);
+                }
+            });
+        }, { rootMargin: '100px' });
+        
+        // 觀察所有圖表容器
+        document.querySelectorAll('.coin-chart').forEach(el => {
+            if (el.dataset.loaded === 'false') {
+                observer.observe(el);
+            }
+        });
+    } else {
+        // 不支援 IntersectionObserver，直接載入所有圖表
+        document.querySelectorAll('.coin-chart').forEach(el => {
+            const symbol = el.id.replace('chart-', '');
+            loadChartForSymbol(symbol, '1d');
+            el.dataset.loaded = 'true';
+        });
+    }
+}
+
+async function loadChartForSymbol(symbol, tf = '1d') {
+    const chartEl = document.getElementById('chart-' + symbol);
+    const loadEl = document.getElementById('chart-load-' + symbol);
+    if (!chartEl) return;
+    
+    try {
+        // 如果已有 chart instance 且時間框架相同，則跳過
+        if (chartInstances[symbol] && chartInstances[symbol].currentTf === tf) {
+            if (loadEl) loadEl.style.display = 'none';
+            return;
+        }
+        
+        // 摧毀舊的 chart instance
+        if (chartInstances[symbol]) {
+            chartInstances[symbol].chart.remove();
+            delete chartInstances[symbol];
+        }
+        
+        // 建立新 chart
+        const chart = LightweightCharts.createChart(chartEl, {
+            width: chartEl.clientWidth || 180,
+            height: 70,
+            layout: {
+                background: { type: 'solid', color: 'transparent' },
+                textColor: '#8B949E',
+            },
+            grid: {
+                vertLines: { visible: false },
+                horzLines: { visible: false },
+            },
+            rightPriceScale: { visible: false },
+            timeScale: { visible: false },
+            crosshair: { mode: 0 },
+            handleScroll: false,
+            handleScale: false,
+        });
+        
+        const candleSeries = chart.addCandlestickSeries({
+            upColor: '#26a69a',
+            downColor: '#ef5350',
+            borderVisible: false,
+            wickUpColor: '#26a69a',
+            wickDownColor: '#ef5350',
+        });
+        
+        // 取得 K 線數據
+        const resp = await fetch(API_BASE + '/api/klines/' + symbol + '?tf=' + tf + '&limit=50');
+        if (!resp.ok) throw new Error('Failed to fetch klines');
+        const klines = await resp.json();
+        
+        // 設定數據
+        candleSeries.setData(klines);
+        
+        // 隱藏載入指示器
+        if (loadEl) loadEl.style.display = 'none';
+        
+        // 保存 instance
+        chartInstances[symbol] = { chart, series: candleSeries, currentTf: tf };
+        
+        // 回應視窗大小變化
+        const resizeHandler = () => {
+            if (chartInstances[symbol]) {
+                chartInstances[symbol].chart.applyOptions({ width: chartEl.clientWidth || 180 });
+            }
+        };
+        window.addEventListener('resize', resizeHandler);
+        
+    } catch (err) {
+        console.warn('Chart load error for', symbol, err);
+        if (loadEl) loadEl.innerHTML = '載入失敗';
+    }
+}
+
+// 時間框架切換
+document.addEventListener('click', async (e) => {
+    if (e.target.classList.contains('tf-btn')) {
+        const btn = e.target;
+        const card = btn.closest('.hero-coin-card');
+        const symbol = card?.dataset.symbol;
+        if (!symbol) return;
+        
+        const newTf = btn.dataset.tf;
+        const siblingBtns = card.querySelectorAll('.tf-btn');
+        siblingBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        // 重新載入圖表
+        const chartEl = document.getElementById('chart-' + symbol);
+        const loadEl = document.getElementById('chart-load-' + symbol);
+        if (chartEl && loadEl) {
+            loadEl.style.display = 'flex';
+            await loadChartForSymbol(symbol, newTf);
+        }
+    }
+});
+</script>
+
+<!-- Coin Detail Modal -->
+<div class="modal-overlay" id="coin-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span class="modal-title" id="modal-title">BTC/USDT</span>
+            <span class="modal-signal long" id="modal-signal">🟢 建議買入</span>
+            <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        
+        <div class="modal-section">
+            <div class="modal-section-title">💰 價格資訊</div>
+            <div class="modal-metric">
+                <span class="modal-metric-label">現價 / 進場價</span>
+                <span class="modal-metric-value" id="modal-price">--</span>
+            </div>
+            <div class="modal-metric">
+                <span class="modal-metric-label">進場價 (Entry)</span>
+                <span class="modal-metric-value" id="modal-entry">--</span>
+            </div>
+            <div class="modal-metric">
+                <span class="modal-metric-label">止盈 (TP)</span>
+                <span class="modal-metric-value" style="color:var(--accent-green);" id="modal-tp">--</span>
+            </div>
+            <div class="modal-metric">
+                <span class="modal-metric-label">止損 (SL)</span>
+                <span class="modal-metric-value" style="color:var(--accent-red);" id="modal-sl">--</span>
+            </div>
+        </div>
+        
+        <div class="modal-section">
+            <div class="modal-section-title">📊 策略指標</div>
+            <div class="modal-metric">
+                <span class="modal-metric-label">信心度 (因子對齊)</span>
+                <span class="modal-metric-value" id="modal-conf">--</span>
+            </div>
+            <div class="modal-metric">
+                <span class="modal-metric-label">平均勝率</span>
+                <span class="modal-metric-value" id="modal-wr">--</span>
+            </div>
+            <div class="modal-metric">
+                <span class="modal-metric-label">平均 Sharpe</span>
+                <span class="modal-metric-value" id="modal-sharpe">--</span>
+            </div>
+            <div class="modal-metric">
+                <span class="modal-metric-label">市場型態</span>
+                <span class="modal-metric-value" id="modal-regime">--</span>
+            </div>
+            <div class="modal-metric">
+                <span class="modal-metric-label">ATR 位置</span>
+                <span class="modal-metric-value" id="modal-atr">--</span>
+            </div>
+            <div class="modal-metric">
+                <span class="modal-metric-label">12H 趨勢</span>
+                <span class="modal-metric-value" id="modal-trend12h">--</span>
+            </div>
+            <div class="modal-metric">
+                <span class="modal-metric-label">24H 趨勢</span>
+                <span class="modal-metric-value" id="modal-trend24h">--</span>
+            </div>
+        </div>
+        
+        <div class="modal-section">
+            <div class="modal-section-title">🔍 因子狀態</div>
+            <div id="modal-factors"></div>
+        </div>
+        
+        <div class="modal-section">
+            <div class="modal-section-title">📖 說明</div>
+            <div class="modal-desc" id="modal-desc"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ─── Coin Detail Modal ───
+let currentCoinData = null;
+
+function showCoinDetail(symbol) {
+    const d = coinDetailCache[symbol];
+    if (!d) return;
+    currentCoinData = d;
+    
+    const m = document.getElementById('coin-modal');
+    const signal = d.signal?.signal || 'FLAT';
+    const conf = ((d.signal?.confidence || 0) * 100).toFixed(0);
+    const price = parseFloat(d.market_context?.price || 0);
+    const avgEntry = parseFloat(d.signal?.avg_entry_price || price);
+    const atrPct = d.market_context?.atr_percentile || 30;
+    const atrMult = atrPct / 1000;
+    const slDist = avgEntry * atrMult;
+    const tpDist = avgEntry * atrMult * 1.5;
+    const avgWr = d.signal?.details?.length > 0
+        ? (d.signal.details.reduce((sum, f) => sum + (f.win_rate || 0), 0) / d.signal.details.length)
+        : 0;
+    const avgSharpe = d.signal?.details?.length > 0
+        ? (d.signal.details.reduce((sum, f) => sum + (f.sharpe || 0), 0) / d.signal.details.length)
+        : 0;
+    
+    document.getElementById('modal-title').textContent = symbol.replace('USDT', '/USDT');
+    document.getElementById('modal-signal').textContent = signal === 'LONG' ? '🟢 建議買入' : (signal === 'SHORT' ? '🔴 建議賣出' : '⚪ 觀望');
+    document.getElementById('modal-signal').className = 'modal-signal ' + (signal === 'LONG' ? 'long' : (signal === 'SHORT' ? 'short' : 'flat'));
+    
+    document.getElementById('modal-price').textContent = '$' + price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('modal-entry').textContent = '$' + avgEntry.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('modal-tp').textContent = '$' + (avgEntry + tpDist).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('modal-sl').textContent = '$' + (avgEntry - slDist).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('modal-wr').textContent = avgWr.toFixed(1) + '%';
+    document.getElementById('modal-sharpe').textContent = avgSharpe.toFixed(2);
+    document.getElementById('modal-conf').textContent = conf + '%';
+    document.getElementById('modal-regime').textContent = d.market_context?.regime || 'unknown';
+    document.getElementById('modal-atr').textContent = atrPct.toFixed(1) + '%';
+    document.getElementById('modal-trend12h').textContent = (d.market_context?.trend_12h_pct || 0).toFixed(2) + '%';
+    document.getElementById('modal-trend24h').textContent = (d.market_context?.trend_24h_pct || 0).toFixed(2) + '%';
+    
+    // Factors - only show those with WR >= 50%
+    const allFactors = d.signal?.details || [];
+    const highWrFactors = allFactors.filter(f => f.win_rate >= 50);
+    const factorsHtml = highWrFactors.length > 0
+        ? highWrFactors.map(f => {
+            const isActive = f.active;
+            return `
+                <div class="modal-factor ${isActive ? 'active' : 'inactive'}">
+                    <span class="modal-factor-name">${isActive ? '✅' : '❌'} ${f.name}</span>
+                    <span class="modal-factor-stats">勝率 ${f.win_rate.toFixed(1)}% · Sharpe ${f.sharpe.toFixed(2)}</span>
+                </div>
+            `;
+        }).join('')
+        : '<div style="color:var(--text-secondary);padding:8px 0;">目前沒有勝率≥50%的策略</div>';
+    document.getElementById('modal-factors').innerHTML = factorsHtml;
+    
+    // Description
+    const activeHighWrFactors = highWrFactors.filter(f => f.active);
+    const factorNames = activeHighWrFactors.map(f => f.name).join(' + ');
+    document.getElementById('modal-desc').innerHTML = `
+        <strong>進場價：</strong>$${avgEntry.toLocaleString()}（策略歷史平均進場價，基於9年回測數據）<br>
+        <strong>現價：</strong>$${price.toLocaleString()}（目前市場價格）<br>
+        <strong>止盈/止損：</strong>基於 ATR 波動率計算<br><br>
+        <strong>信號原因：</strong>${factorNames || '無活躍的高勝率策略'}<br><br>
+        <strong>信心度：</strong>當前市場條件滿足的因子數量 / 總因子數 = ${conf}%<br><br>
+        <strong>勝率：</strong>過去9年歷史回測，符合相同條件的交易中獲勝比例（顯示≥50%的策略）
+    `;
+    
+    m.classList.add('active');
+}
+
+function closeModal() {
+    document.getElementById('coin-modal').classList.remove('active');
+}
+
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal-overlay')) closeModal();
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "experiment_id": "43f55fc41eca",
+  "commit_hash": "unknown",
+  "strategy_name": "MACrossoverStrategy",
+  "params": {
+    "fast_period": 6,
+    "slow_period": 195
+  },
+  "metrics": {
+    "sharpe_ratio": -6.059126655382787,
+    "max_drawdown_pct": 0.201636518080104,
+    "win_rate": 0.0,
+    "total_return_pct": -0.201636518080104,
+    "profit_factor": 0.0,
+    "total_trades": 12,
+    "volatility": -6.059126655382787,
+    "sortino_ratio": -6.059126655382787
+  },
+  "status": "discard",
+  "description": "❌ 放棄: 夏普值過低 (-6.059)",
+  "timestamp": "2026-03-27T00:32:03.159989",
+  "duration_seconds": 93.33,
+  "backtest_period": {
+    "start": "2017-01-01",
+    "end": "2026-12-31"
+  }
+}

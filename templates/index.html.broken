@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>加密貨幣量化交易 Agent 平台</title>
+    <style>
+        :root {
+            --bg-primary: #0D1117;
+            --bg-secondary: #161B22;
+            --bg-card: #21262D;
+            --text-primary: #E6EDF3;
+            --text-secondary: #8B949E;
+            --accent-green: #10B981;
+            --accent-red: #EF4444;
+            --accent-blue: #3B82F6;
+            --accent-yellow: #F59E0B;
+            --accent-orange: #F97316;
+            --border-color: #30363D;
+            --card-radius: 12px;
+            --card-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
+        .container { max-width: 1600px; margin: 0 auto; padding: 0 20px 30px; }
+
+        /* ===== Header ===== */
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
+        h1 { font-size: 22px; display: flex; align-items: center; gap: 10px; }
+        .status-badge { background: var(--accent-green); color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; }
+        .header-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .refresh-btn { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+        .refresh-btn:hover { background: var(--bg-secondary); transform: translateY(-1px); }
+        .last-update { font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+        .last-update .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-green); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+        .sse-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 10px; background: var(--bg-secondary); border-radius: 12px; }
+        .sse-status .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .sse-status.connected .dot { background: var(--accent-green); }
+        .sse-status.disconnected .dot { background: var(--accent-red); }
+
+        /* ===== Hero Card ===== */
+        .hero-card {
+            background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-secondary) 100%);
+            border: 1px solid var(--border-color);
+            border-radius: var(--card-radius);
+            padding: 20px 24px;
+            margin-bottom: 20px;
+            box-shadow: var(--card-shadow);
+            transition: all 0.3s ease;
+        }
+        .hero-card:hover { border-color: var(--accent-blue); }
+        .hero-main { display: flex; align-items: center; gap: 20px; margin-bottom: 15px; flex-wrap: wrap; }
+        .hero-symbol { font-size: 20px; font-weight: 800; color: var(--text-primary); }
+        .hero-price { font-size: 32px; font-weight: bold; color: var(--text-primary); }
+        .hero-change { font-size: 18px; font-weight: 700; padding: 4px 12px; border-radius: 8px; }
+        .hero-change.positive { background: rgba(16,185,129,0.2); color: var(--accent-green); }
+        .hero-change.negative { background: rgba(239,68,68,0.2); color: var(--accent-red); }
+        .hero-row { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; }
+        .hero-fear, .hero-signal, .hero-anomaly { 
+            display: flex; align-items: center; gap: 8px; 
+            padding: 8px 14px; 
+            background: var(--bg-secondary); 
+            border-radius: 8px; 
+            font-size: 13px;
+            border-left: 3px solid;
+        }
+        .hero-fear { border-left-color: var(--accent-yellow); }
+        .hero-signal { border-left-color: var(--accent-blue); }
+        .hero-anomaly { border-left-color: var(--accent-orange); }
+
+        /* ===== Tab Navigation ===== */
+        .tab-nav {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 20px;
+            padding: 4px;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .tab-nav::-webkit-scrollbar { display: none; }
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+        .tab-btn:hover { color: var(--text-primary); background: var(--bg-card); }
+        .tab-btn.active { background: var(--accent-blue); color: white; }
+        .tab-content { display: none; animation: fadeIn 0.3s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .section-title { font-size: 16px; font-weight: 700; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+        .section-title .badge { background: var(--bg-card); border: 1px solid var(--border-color); padding: 2px 8px; border-radius: 10px; font-size: 11px; color: var(--text-secondary); }
+
+        /* ===== Coin Grid ===== */
+        .coin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .coin-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--card-radius); padding: 14px 12px; cursor: default; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; position: relative; overflow: hidden; }
+        .coin-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); border-color: var(--accent-blue); }
+        .coin-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: var(--card-radius) var(--card-radius) 0 0; }
+        .coin-card.positive::before { background: var(--accent-green); }
+        .coin-card.negative::before { background: var(--accent-red); }
+        .coin-card.neutral::before { background: var(--text-secondary); }
+        .coin-name { font-size: 15px; font-weight: 800; color: var(--text-primary); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+        .coin-name .star { font-size: 11px; }
+        .coin-price { font-size: 17px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+        .coin-change { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+        .coin-change.positive { color: var(--accent-green); }
+        .coin-change.negative { color: var(--accent-red); }
+        .coin-change.neutral { color: var(--text-secondary); }
+        .coin-signal { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+        .signal-strong { background: rgba(16,185,129,0.2); color: var(--accent-green); }
+        .signal-medium { background: rgba(245,158,11,0.2); color: var(--accent-yellow); }
+        .signal-weak { background: rgba(139,148,158,0.2); color: var(--text-secondary); }
+        .coin-trend { font-size: 11px; color: var(--text-secondary); }
+
+        /* ===== Cards & Grid ===== */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 20px; }
+        .grid-full { grid-column: 1 / -1; }
+        .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--card-radius); padding: 20px; box-shadow: var(--card-shadow); transition: border-color 0.2s; }
+        .card:hover { border-color: rgba(59,130,246,0.3); }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .card-title { font-size: 13px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+        .card-value { font-size: 30px; font-weight: bold; }
+
+        /* ===== Fear/Greed ===== */
+        .fear-greed-container { text-align: center; }
+        .fear-greed-emoji { font-size: 36px; margin-bottom: 10px; }
+        .fear-greed-value { font-size: 48px; font-weight: bold; margin: 10px 0; }
+        .fear-greed-label { font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; }
+        .fear-greed-bar { height: 12px; border-radius: 6px; background: linear-gradient(to right, var(--accent-red), var(--accent-yellow), var(--accent-green)); position: relative; margin: 15px 0; }
+        .fear-greed-indicator { position: absolute; top: -4px; width: 20px; height: 20px; background: white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3); transform: translateX(-50%); transition: left 0.5s ease; }
+        .fear-greed-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); margin-top: 5px; }
+
+        /* ===== Status Lights (統一燈號) ===== */
+        .status-light { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .status-light.green { background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); }
+        .status-light.yellow { background: var(--accent-yellow); box-shadow: 0 0 8px var(--accent-yellow); }
+        .status-light.red { background: var(--accent-red); box-shadow: 0 0 8px var(--accent-red); }
+        .status-light.gray { background: var(--text-secondary); }
+        .status-light.blue { background: var(--accent-blue); box-shadow: 0 0 8px var(--accent-blue); animation: pulse 1.5s infinite; }
+
+        /* ===== Whale List ===== */
+        .whale-list { display: flex; flex-direction: column; gap: 10px; max-height: 250px; overflow-y: auto; }
+        .whale-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-secondary); border-radius: 8px; border-left: 3px solid var(--accent-green); transition: transform 0.2s; }
+        .whale-item:hover { transform: translateX(4px); }
+        .whale-item.outflow { border-left-color: var(--accent-red); }
+        .whale-info { display: flex; align-items: center; gap: 10px; }
+        .whale-icon { font-size: 20px; }
+        .whale-direction { font-size: 12px; padding: 2px 8px; border-radius: 4px; }
+        .whale-direction.in { background: rgba(16,185,129,0.2); color: var(--accent-green); }
+        .whale-direction.out { background: rgba(239,68,68,0.2); color: var(--accent-red); }
+        .whale-amount { font-weight: 500; font-size: 14px; }
+        .whale-time { font-size: 11px; color: var(--text-secondary); }
+
+        /* ===== Anomaly List ===== */
+        .anomaly-list { display: flex; flex-direction: column; gap: 10px; max-height: 200px; overflow-y: auto; }
+        .anomaly-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px; background: var(--bg-secondary); border-radius: 8px; border-left: 3px solid var(--accent-yellow); transition: transform 0.2s; }
+        .anomaly-item:hover { transform: translateX(4px); }
+        .anomaly-item.critical { border-left-color: var(--accent-red); }
+        .anomaly-icon { font-size: 20px; }
+        .anomaly-content { flex: 1; }
+        .anomaly-title { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+        .anomaly-desc { font-size: 12px; color: var(--text-secondary); }
+        .anomaly-time { font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
+
+        /* ===== Signal List ===== */
+        .signal-list { display: flex; flex-direction: column; gap: 12px; }
+        .signal-item { background: var(--bg-secondary); border-radius: 8px; padding: 15px; display: flex; justify-content: space-between; align-items: center; transition: transform 0.2s, box-shadow 0.2s; }
+        .signal-item:hover { transform: translateX(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .signal-left { display: flex; align-items: center; gap: 12px; }
+        .signal-icon { font-size: 24px; }
+        .signal-info h4 { font-size: 16px; margin-bottom: 4px; }
+        .signal-info span { font-size: 12px; color: var(--text-secondary); }
+        .confidence { text-align: center; }
+        .confidence-score { font-size: 24px; font-weight: bold; }
+        .confidence-stars { color: var(--accent-yellow); font-size: 14px; }
+
+        /* ===== Agent List ===== */
+        .agent-list { display: flex; flex-direction: column; gap: 10px; }
+        .agent-item { display: flex; align-items: center; gap: 12px; padding: 10px; background: var(--bg-secondary); border-radius: 8px; transition: transform 0.2s; }
+        .agent-item:hover { transform: translateX(4px); }
+
+        /* ===== Strategy ===== */
+        .strategy-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 8px; transition: transform 0.2s; }
+        .strategy-item:hover { transform: translateX(4px); }
+        .strategy-signal { padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+        .strategy-signal.bullish { background: rgba(16,185,129,0.2); color: var(--accent-green); }
+        .strategy-signal.bearish { background: rgba(239,68,68,0.2); color: var(--accent-red); }
+        .strategy-signal.neutral { background: rgba(139,148,158,0.2); color: var(--text-secondary); }
+
+        /* ===== Ranking ===== */
+        .rank-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 8px; transition: transform 0.2s; }
+        .rank-item:hover { transform: translateX(4px); }
+        .rank-badge { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; margin-right: 10px; }
+        .rank-1 { background: linear-gradient(135deg, #FFD700, #FFA500); color: #000; }
+        .rank-2 { background: linear-gradient(135deg, #C0C0C0, #888); color: #000; }
+        .rank-3 { background: linear-gradient(135deg, #CD7F32, #8B4513); color: #fff; }
+        .rank-n { background: var(--bg-card); color: var(--text-secondary); }
+
+        /* ===== Skeleton Loading ===== */
+        .loading { text-align: center; padding: 30px; color: var(--text-secondary); }
+        .error { color: var(--accent-red); padding: 20px; text-align: center; }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .skeleton {
+            background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-card) 50%, var(--bg-secondary) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 6px;
+        }
+        .skeleton-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--card-radius);
+            padding: 14px 12px;
+            height: 120px;
+        }
+        .skeleton-line { height: 12px; margin-bottom: 8px; }
+        .skeleton-line.short { width: 40%; }
+        .skeleton-line.medium { width: 70%; }
+        .skeleton-line.long { width: 90%; }
+        .last-update-time { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+        .timestamp { font-size: 12px; color: var(--text-secondary); text-align: center; margin-top: 20px; }
+
+        /* ===== Responsive Design ===== */
+        @media (max-width: 1024px) {
+            .grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+            .coin-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+            header { flex-direction: column; align-items: flex-start; }
+            .header-controls { width: 100%; justify-content: space-between; }
+            .hero-card { padding: 16px; }
+            .hero-price { font-size: 26px; }
+            .hero-change { font-size: 16px; }
+            .hero-row { flex-direction: column; gap: 10px; }
+            .hero-fear, .hero-signal, .hero-anomaly { font-size: 12px; padding: 6px 10px; }
+            .tab-btn { padding: 8px 14px; font-size: 13px; }
+        }
+        @media (max-width: 480px) {
+            .container { padding: 0 12px 20px; }
+            .coin-grid { grid-template-columns: repeat(2, 1fr); }
+            .hero-main { flex-direction: column; align-items: flex-start; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <header>
+        <h1>🤖 加密貨幣量化交易平台 <span class="status-badge" id="status-badge">載入中</span></h1>
+        <div class="header-controls">
+            <div class="sse-status connected" id="sse-status"><span class="dot"></span><span id="sse-text">已連接</span></div>
+            <button class="refresh-btn" onclick="refreshAll()">🔄 重新整理</button>
+            <div class="last-update" id="last-update"><span class="dot"></span><span>--</span></div>
+        </div>
+    </header>
+
+    <!-- ===== Hero Card ===== -->
+    <div class="hero-card" id="hero-card">
+        <div class="hero-main">
+            <div class="hero-symbol" id="hero-symbol">BTC/USDT</div>
+            <div class="hero-price" id="hero-price">$--</div>
+            <div class="hero-change" id="hero-change">--%</div>
+        </div>
+        <div class="hero-row">
+            <div class="hero-fear">😱 恐懼: <span id="hero-fear-value">--</span></div>
+            <div class="hero-signal">🚀 進場訊號：<span id="hero-signal-text">--</span></div>
+            <div class="hero-anomaly" id="hero-anomaly" style="display:none;">⚠️ 異常：<span id="hero-anomaly-text">--</span></div>
+        </div>
+    </div>
+
+    <!-- ===== Tab Navigation ===== -->
+    <div class="tab-nav">
+        <button class="tab-btn active" data-tab="overview">📊 總覽</button>
+        <button class="tab-btn" data-tab="coins">🪙 幣種</button>
+        <button class="tab-btn" data-tab="signals">📈 訊號</button>
+        <button class="tab-btn" data-tab="sentiment">📰 情緒</button>
+        <button class="tab-btn" data-tab="rankings">🏆 排行</button>
+    </div>
+
+    <!-- ===== Tab: Overview (總覽) ===== -->
+    <div class="tab-content active" id="tab-overview">
+        <div class="grid">
+            <div class="card">
+                <div class="card-header"><span class="card-title">😨😰😐🙂😁 市場情緒</span></div>
+                <div class="fear-greed-container">
+                    <div class="fear-greed-emoji" id="fear-greed-emoji"><span class="skeleton" style="display:inline-block;width:36px;height:36px;border-radius:50%;"></span></div>
+                    <div class="fear-greed-value" id="fear-greed-value"><span class="skeleton" style="display:inline-block;width:80px;height:48px;"></span></div>
+                    <div class="fear-greed-label" id="fear-greed-label">載入中...</div>
+                    <div class="fear-greed-bar"><div class="fear-greed-indicator" id="fear-greed-indicator" style="left:50%;"></div></div>
+                    <div class="fear-greed-scale"><span>極度恐懼</span><span>恐懼</span><span>中性</span><span>貪婪</span><span>極度貪婪</span></div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header"><span class="card-title">🚀 最新進場訊號</span> <span id="signal-count" style="font-size:12px;color:var(--text-secondary);">0 筆</span></div>
+                <div id="latest-signal" style="margin-bottom:10px;font-size:13px;color:var(--text-secondary);">--</div>
+                <div class="signal-list" id="signal-list"><div class="loading">載入中...</div></div>
+            </div>
+        </div>
+        <div class="card grid-full">
+            <div class="card-header"><span class="card-title">⚠️ 異常警報</span> <span id="anomaly-count" style="font-size:12px;color:var(--text-secondary);">0 項異常</span></div>
+            <div class="anomaly-list" id="anomaly-list-overview">
+                <div class="skeleton skeleton-line long"></div>
+                <div class="skeleton skeleton-line medium"></div>
+            </div>
+            <div class="last-update-time" id="anomaly-updated-overview"></div>
+        </div>
+    </div>
+
+    <!-- ===== Tab: Coins (幣種) ===== -->
+    <div class="tab-content" id="tab-coins">
+        <div class="section-title">🪙 Top 20 幣種追蹤 <span class="badge" id="coin-count-badge">-- 幣種</span></div>
+        <div class="coin-grid" id="coin-grid">
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-card"></div>
+        </div>
+        <div class="last-update-time" id="coin-grid-updated"></div>
+    </div>
+
+    <!-- ===== Tab: Signals (訊號) ===== -->
+    <div class="tab-content" id="tab-signals">
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">📜 訊號歷史</span>
+                <div style="display:flex;gap:10px;align-items:center;">
+                    <select id="history-symbol" onchange="refreshSignalHistory()" style="background:var(--bg-secondary);border:1px solid var(--border-color);color:var(--text-primary);padding:4px 8px;border-radius:4px;font-size:12px;">
+                        <option value="">全部幣種</option><option value="BTCUSDT">BTC</option><option value="ETHUSDT">ETH</option><option value="SOLUSDT">SOL</option>
+                    </select>
+                    <span id="signal-stats" style="font-size:12px;color:var(--text-secondary);">--</span>
+                </div>
+            </div>
+            <div id="signal-history-list" style="max-height:400px;overflow-y:auto;"><div class="loading">載入中...</div></div>
+        </div>
+    </div>
+
+    <!-- ===== Tab: Sentiment (情緒) ===== -->
+    <div class="tab-content" id="tab-sentiment">
+        <div class="grid">
+            <div class="card">
+                <div class="card-header"><span class="card-title">🐋 鯨魚活動</span></div>
+                <div class="whale-list" id="whale-list">
+                    <div class="skeleton skeleton-line long"></div>
+                    <div class="skeleton skeleton-line medium"></div>
+                    <div class="skeleton skeleton-line short"></div>
+                </div>
+                <div class="last-update-time" id="whale-updated"></div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">📰 市場情緒文章</span>
+                    <span id="article-count" style="font-size:12px;color:var(--text-secondary);">0 篇</span>
+                </div>
+                <div id="articles-list" style="max-height:250px;overflow-y:auto;"><div class="loading">載入中...</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Tab: Rankings (排行) ===== -->
+    <div class="tab-content" id="tab-rankings">
+        <div class="card">
+            <div class="card-header"><span class="card-title">🏆 策略排行榜</span></div>
+            <div id="ranking-list"><div class="loading">載入中...</div></div>
+        </div>
+        <div class="card">
+            <div class="card-header"><span class="card-title">🤖 Agent 狀態</span></div>
+            <div class="agent-list" id="agent-list"><div class="loading">載入中...</div></div>
+        </div>
+        <div class="card">
+            <div class="card-header"><span class="card-title">⚙️ 策略狀態</span></div>
+            <div id="strategy-list"><div class="loading">載入中...</div></div>
+        </div>
+    </div>
+
+    <div class="timestamp" id="timestamp"></div>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+let currentCoin = 'BTCUSDT';
+let coinDataCache = [];
+let eventSource = null;
+let latestSignalData = null;
+let latestAnomalyData = null;
+
+// ===== Tab Navigation =====
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        const tabId = 'tab-' + btn.dataset.tab;
+        document.getElementById(tabId).classList.add('active');
+    });
+});
+
+async function fetchAPI(endpoint) {
+    try { const r = await fetch(API_BASE + endpoint); if (!r.ok) throw new Error('API error'); return await r.json(); }
+    catch (e) { console.error('Fetch error:', e); return null; }
+}
+
+async function refreshStatus() {
+    const d = await fetchAPI('/api/status');
+    if (d) {
+        document.getElementById('status-badge').textContent = d.status === 'running' ? '運行中' : '已停止';
+        document.getElementById('status-badge').style.background = d.status === 'running' ? 'var(--accent-green)' : 'var(--accent-red)';
+    }
+}
+
+async function refreshTopCoins() {
+    const d = await fetchAPI('/api/topcoins');
+    const anomaliesData = await fetchAPI('/api/anomalies/all');
+    const anomalySymbols = {};
+    if (anomaliesData && anomaliesData.anomalies) {
+        anomaliesData.anomalies.forEach(a => { anomalySymbols[a.symbol] = a; });
+    }
+    const grid = document.getElementById('coin-grid');
+    const countBadge = document.getElementById('coin-count-badge');
+    if (!d || !Array.isArray(d) || d.length === 0) { grid.innerHTML = '<div class="error" style="grid-column:1/-1;">載入失敗</div>'; return; }
+    coinDataCache = d;
+    countBadge.textContent = d.length + ' 幣種';
+    document.getElementById('coin-grid-updated').textContent = '上次更新: ' + new Date().toLocaleTimeString('zh-TW');
+
+    // Update Hero Card with first coin (BTC)
+    const btc = d.find(c => c.symbol === 'BTC') || d[0];
+    if (btc) {
+        document.getElementById('hero-symbol').textContent = btc.symbol + '/USDT';
+        const priceStr = btc.price < 1 ? '$' + btc.price.toFixed(6) : '$' + btc.price.toLocaleString();
+        document.getElementById('hero-price').textContent = priceStr;
+        const changeEl = document.getElementById('hero-change');
+        changeEl.textContent = (btc.change_24h >= 0 ? '+' : '') + btc.change_24h + '%';
+        changeEl.className = 'hero-change ' + (btc.change_24h >= 0 ? 'positive' : 'negative');
+    }
+
+    grid.innerHTML = d.map(coin => {
+        const changeClass = coin.change_24h > 0 ? 'positive' : coin.change_24h < 0 ? 'negative' : 'neutral';
+        const stars = coin.confidence >= 80 ? '★★★★' : coin.confidence >= 60 ? '★★★' : coin.confidence >= 40 ? '★★' : '★';
+        const prefix = coin.change_24h >= 0 ? '+' : '';
+        const priceStr = coin.price < 1 ? '$' + coin.price.toFixed(6) : '$' + coin.price.toLocaleString();
+        const isSelected = coin.symbol + 'USDT' === currentCoin || coin.symbol + 'USDT' === currentCoin.replace('USDT', 'USDT');
+        const anomaly = anomalySymbols[coin.symbol];
+        let anomalyIcon = '';
+        if (anomaly) {
+            const sev = anomaly.anomalies && anomaly.anomalies[0] ? anomaly.anomalies[0].severity : 'warning';
+            anomalyIcon = '<span style="position:absolute;top:8px;right:8px;font-size:14px;" title="異常警報">' + (sev === 'critical' ? '🚨' : '⚠️') + '</span>';
+        }
+        const selectedBorder = isSelected ? 'border-color:var(--accent-blue);box-shadow:0 0 0 2px rgba(59,130,246,0.4);' : '';
+        return '<div class="coin-card ' + changeClass + '" style="' + selectedBorder + '" data-symbol="' + coin.symbol + 'USDT" onclick="onCoinChange(this.dataset.symbol)">' + anomalyIcon +
+            '<div class="coin-name">' + coin.symbol + ' <span class="star">' + (coin.confidence >= 70 ? '🔔' : '🔕') + '</span></div>' +
+            '<div class="coin-price">' + priceStr + '</div>' +
+            '<div class="coin-change ' + changeClass + '">' + prefix + coin.change_24h + '%</div>' +
+            '<div class="coin-signal ' + coin.signal_class + '">' + coin.signal + ' ' + stars + '</div>' +
+            '<div class="coin-trend">' + coin.trend + '</div>' +
+            '</div>';
+    }).join('');
+}
+
+function getFearGreedData(v) {
+    const cfg = [{min:0,max:20,emoji:'😱',label:'極度恐懼',color:'#EF4444'},{min:20,max:40,

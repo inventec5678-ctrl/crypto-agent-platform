@@ -1,0 +1,1894 @@
+"""FastAPI 主程式"""
+import asyncio
+import json
+import logging
+import os
+import re
+import statistics
+import websockets
+from contextlib import asynccontextmanager
+from datetime import datetime
+from typing import Any, Optional
+
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse, StreamingResponse
+from pydantic import BaseModel
+from config import settings
+from binance_client import binance_client
+from strategies import get_all_strategies
+from ai_analyst import AIAnalyst
+from notification import notification_manager
+
+# 新模組
+from strategy_ranking import get_ranking_service, TradeDirection
+from social_sentiment import SentimentAggregator
+from social_sentiment.config import SentimentConfig
+from whale_tracker import WhaleTracker
+import signals_db
+
+# Autoresearch 整合
+from autoresearch import Persistence
+_autoresearch_persistence = None
+
+def get_ar_persistence():
+    global _autoresearch_persistence
+    if _autoresearch_persistence is None:
+        _autoresearch_persistence = Persistence(
+            os.path.join(os.path.dirname(__file__), "autoresearch")
+        )
+    return _autoresearch_persistence
+
+# 初始化 ranking service（避免懶加載並發問題）
+_ranker_initialized = False
+
+
+def _seed_ranking_service():
+    """Seed ranking service with strategy names only (no mock trades).
+    
+    Waits for team-strategy-dev's real backtest results to populate trades.
+    """
+    global _ranker_initialized
+    if _ranker_initialized:
+        return
+    
+    try:
+        ranker = get_ranking_service()
+        
+        # Only register strategy names - no mock trades
+        strategies = ["MA_Cross", "RSI_Reversal", "BB_Breakout", "MACD_Signal", "Supertrend"]
+        
+        for name in strategies:
+            ranker.register_strategy(name)
+        
+        _ranker_initialized = True
+        logger.info("Ranking service seeded with strategy names only (waiting for real backtest results)")
+    except Exception as e:
+        logger.warning(f"Could not seed ranking service: {e}")
+
+# 設定日誌
+logging.basicConfig(
+    level=getattr(logging, settings.log_level),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+# 策略清單
+STRATEGIES = ["MA_Cross", "RSI_Reversal", "BB_Breakout"]
+DEFAULT_SYMBOLS = ["BTCUSDT", "ETHUSDT"]
+
+
+class StatusResponse(BaseModel):
+    """系統狀態回應"""
+    status: str
+    timestamp: str
+    version: str = "1.0.0"
+
+
+class SignalResponse(BaseModel):
+    """訊號回應"""
+    symbol: str
+    signal: str
+    direction: str
+    price: float
+    strategy: str
+    ai_confidence: float
+    ai_rating: str
+    timestamp: str
+
+
+class StrategyStatus(BaseModel):
+    """策略狀態"""
+    name: str
+    enabled: bool
+    last_run: Optional[str]
+    last_signal: Optional[str]
+    strategy_id: Optional[str] = None
+    timeframe: Optional[str] = None
+    win_rate: Optional[float] = None
+    profit_factor: Optional[float] = None
+    max_drawdown: Optional[float] = None
+    sharpe: Optional[float] = None
+
+
+# ─── 訂單簿追蹤全域狀態 ────────────────────────────────────────────────────────
+_order_book_history: dict[str, list] = {}  # symbol -> [{"asks_total", "bids_total", "ts"}, ...]
+_ORDER_BOOK_WINDOW = 20  # 保留多少筆歷史
+_ORDER_BOOK_INTERVAL = 300  # 秒，更新頻率
+_last_order_book_update = 0
+
+async def _update_order_book_for_all():
+    """背景更新所有幣種的訂單簿"""
+    global _last_order_book_update
+    import time
+    if time.time() - _last_order_book_update < _ORDER_BOOK_INTERVAL:
+        return
+    _last_order_book_update = time.time()
+    async def _update_one(sym):
+        try:
+            ob = await binance_client.get_order_book(sym.upper(), limit=100)
+            base = sym.replace("USDT", "")
+            if base not in _order_book_history:
+                _order_book_history[base] = []
+            _order_book_history[base].append({"asks_total": ob["asks_total"], "bids_total": ob["bids_total"], "ts": time.time()})
+            _order_book_history[base] = _order_book_history[base][-_ORDER_BOOK_WINDOW:]
+        except: pass
+    await asyncio.gather(*[_update_one(c) for c in TOP_COINS])
+
+# 全域狀態
+_app_state = {
+    "last_signals": [],
+    "strategy_statuses": {},
+    "is_running": False,
+    "last_analysis": None
+}
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """應用程式生命週期"""
+    logger.info("Starting Crypto Agent Platform...")
+    _app_state["is_running"] = True
+    
+    # 初始化 ranking service
+    _seed_ranking_service()
+    
+    # 啟動大額掛單追蹤（背景）
+    try:
+        asyncio.create_task(large_order_tracker.start_tracking(TOP_COINS[:5]))
+        logger.info("Large order tracker started for top 5 coins")
+    except Exception as e:
+        logger.warning(f"Could not start large order tracker: {e}")
+    
+    # 啟動時執行一次分析
+    try:
+        await run_analysis()
+    except Exception as e:
+        logger.error(f"Initial analysis failed: {e}")
+    
+    yield
+    
+    logger.info("Shutting down Crypto Agent Platform...")
+    _app_state["is_running"] = False
+    large_order_tracker.stop_tracking()
+
+
+app = FastAPI(
+    title="Crypto Agent Platform",
+    description="加密貨幣量化交易提醒平台",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+
+@app.get("/api/status", response_model=StatusResponse)
+async def get_status():
+    """取得系統狀態"""
+    return StatusResponse(
+        status="running" if _app_state["is_running"] else "stopped",
+        timestamp=datetime.now().isoformat(),
+        version="1.0.0"
+    )
+
+
+@app.get("/api/signals", response_model=list[SignalResponse])
+async def get_signals(symbol: Optional[str] = None, limit: int = 10):
+    """取得最新訊號"""
+    signals = _app_state["last_signals"]
+    
+    if symbol:
+        signals = [s for s in signals if s.get("symbol") == symbol]
+    
+    return signals[-limit:]
+
+
+@app.get("/api/signals/history")
+async def get_signal_history(symbol: Optional[str] = None, strategy: Optional[str] = None, days: int = 7, limit: int = 100):
+    """取得歷史訊號（可依策略篩選）"""
+    try:
+        history = signals_db.get_signal_history(symbol=symbol, days=days, limit=limit)
+        if strategy:
+            strategy_lower = strategy.lower().replace(" ", "_").replace("-", "_")
+            history = [
+                h for h in history
+                if h.get("strategy") and strategy_lower in h.get("strategy", "").lower().replace(" ", "_").replace("-", "_")
+            ]
+        return {
+            "signals": history,
+            "count": len(history),
+            "symbol": symbol,
+            "strategy": strategy,
+            "days": days,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Signal history error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/signals/stats")
+async def get_signal_stats(symbol: str = "BTCUSDT", days: int = 30):
+    """取得訊號統計"""
+    try:
+        stats = signals_db.get_signal_stats(symbol=symbol, days=days)
+        return {
+            **stats,
+            "symbol": symbol,
+            "period_days": days,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Signal stats error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/strategies", response_model=list[StrategyStatus])
+async def get_strategies():
+    """取得已驗證的 5 個策略（用於 Dashboard 顯示）"""
+    try:
+        lib_path = os.path.join(os.path.dirname(__file__), "autoresearch", "factor_library.json")
+        with open(lib_path) as f:
+            lib = json.load(f)
+        strategies = lib if isinstance(lib, list) else lib.get("strategies", [])
+    except:
+        strategies = []
+    
+    # 只取 status=verified 的策略
+    verified = [s for s in strategies if s.get("status") == "verified"]
+    
+    # 備援：取前 5 個
+    if not verified:
+        verified = strategies[:5]
+    
+    statuses = []
+    for s in verified:
+        metrics = s.get("metrics", {})
+        statuses.append(StrategyStatus(
+            strategy_id=s.get("factor_id", ""),
+            name=s.get("name", ""),
+            enabled=True,
+            last_run=None,
+            last_signal=None,
+            timeframe=s.get("timeframe"),
+            win_rate=metrics.get("win_rate"),
+            profit_factor=metrics.get("profit_factor"),
+            max_drawdown=metrics.get("max_drawdown"),
+            sharpe=metrics.get("sharpe"),
+        ))
+    return statuses
+
+
+# ─── Live Strategy Matching ─────────────────────────────────────────────────
+
+
+def _ema(cs: list, period: int) -> float:
+    """Calculate EMA for a list of close prices."""
+    k_val = 2 / (period + 1)
+    ema = cs[0]
+    for cx in cs[1:]:
+        ema = cx * k_val + ema * (1 - k_val)
+    return ema
+
+
+def _rsi(cs: list) -> float:
+    """Calculate RSI(14) for a list of close prices."""
+    deltas = [cs[j] - cs[j-1] for j in range(1, len(cs))
+    gains = [d for d in deltas[-14:] if d > 0]
+    losses = [-d for d in deltas[-14:] if d < 0]
+    avg_gain = sum(gains) / 14 if gains else 0
+    avg_loss = sum(losses) / 14 if losses else 0
+    rs = avg_gain / avg_loss if avg_loss else 100
+    return 100 - (100 / (1 + rs))
+
+
+def _ema(cs, period):
+    k_val = 2 / (period + 1)
+    ema = cs[0]
+    for cx in cs[1:]:
+        ema = cx * k_val + ema * (1 - k_val)
+    return ema
+
+def _rsi(cs):
+    deltas = [cs[j] - cs[j-1] for j in range(1, len(cs))
+    gains = [d for d in deltas[-14:] if d > 0]
+    losses = [-d for d in deltas[-14:] if d < 0]
+    avg_gain = sum(gains) / 14 if gains else 0
+    avg_loss = sum(losses) / 14 if losses else 0
+    rs = avg_gain / avg_loss if avg_loss else 100
+    return 100 - (100 / (1 + rs))
+
+
+def _ema(cs: list, period: int) -> float:
+    """Calculate EMA."""
+    k_val = 2 / (period + 1)
+    ema = cs[0]
+    for cx in cs[1:]:
+        ema = cx * k_val + ema * (1 - k_val)
+    return ema
+
+def _rsi(cs: list) -> float:
+    """Calculate RSI(14)."""
+    deltas = [cs[j] - cs[j-1] for j in range(1, len(cs))
+    gains = [d for d in deltas[-14:] if d > 0]
+    losses = [-d for d in deltas[-14:] if d < 0]
+    avg_gain = sum(gains) / 14 if gains else 0
+    avg_loss = sum(losses) / 14 if losses else 0
+            ok = ma200 is not None and price < ma200
+        if ok:
+
+def _eval_at_candle(candle_idx: int, conds: dict, daily: list, h4: list, tf: str) -> tuple:
+    """Evaluate strategy conditions at a specific historical candle. Returns (matched, total)."""
+    klines = daily if tf == "1D" else h4
+    closes = [float(k["close"]) for k in klines]
+    cs = closes[:candle_idx + 1]
+    
+    if len(cs) < 21:
+        return 0, 0
+    
+    price = cs[-1]
+    rsi_val = _rsi(cs)
+    
+    # MA cross
+    ma20 = sum(cs[-20:]) / 20
+    ma50 = sum(cs[-50:]) / 50
+    ma200 = sum(cs[-200:]) / 200 if len(cs) >= 200 else None
+    ma20_prev = sum(closes[max(0, candle_idx-20):candle_idx]) / min(20, candle_idx)
+    ma50_prev = sum(closes[max(0, candle_idx-50):candle_idx]) / min(50, candle_idx)
+    golden = ma20 > ma50 and ma20_prev <= ma50_prev
+    death = ma20 < ma50 and ma20_prev >= ma50_prev
+    
+    # EMA cross
+    ema9 = _ema(cs, 9)
+    ema21 = _ema(cs, 21)
+    ema9_above = ema9 > ema21
+    ema9_below = ema9 < ema21
+    cs_prev = closes[:candle_idx]
+    if len(cs_prev) >= 21:
+        ema9_prev = _ema(cs_prev, 9)
+        ema21_prev = _ema(cs_prev, 21)
+        ema_cross_above = ema9 > ema21 and ema9_prev <= ema21_prev
+        ema_cross_below = ema9 < ema21 and ema9_prev >= ema21_prev
+    else:
+        ema_cross_above = ema_cross_below = False
+    
+    # Momentum
+    momentum_7d = (cs[-1] - cs[-8]) / cs[-8] * 100 if len(cs) >= 8 else 0
+    
+    matched = 0
+    total = 0
+    for cond_name, cond_val in conds.items():
+        if not cond_val:
+            continue
+        total += 1
+        ok = False
+        if cond_name == "golden_cross":
+            ok = golden
+        elif cond_name == "death_cross":
+            ok = death
+        elif cond_name == "SMA20_cross_above_SMA50":
+            ok = golden
+        elif cond_name == "SMA20_cross_below_SMA50":
+            ok = death
+        elif cond_name == "EMA9_cross_above_EMA21":
+            ok = ema_cross_above
+        elif cond_name == "EMA9_cross_below_EMA21":
+            ok = ema_cross_below
+        elif cond_name == "rsi_above_55":
+            ok = rsi_val > 55
+        elif cond_name == "rsi_below_45":
+            ok = rsi_val < 45
+        elif cond_name == "rsi_below_48":
+            ok = rsi_val < 48
+        elif cond_name == "rsi_below_50":
+            ok = rsi_val < 50
+        elif cond_name == "RSI_55_to_70":
+            ok = 55 < rsi_val < 70
+        elif cond_name == "momentum_7d_above_0.5pct":
+            ok = momentum_7d > 0.5
+        elif cond_name == "momentum_7d_below_minus0.5pct":
+            ok = momentum_7d < -0.5
+        elif cond_name == "momentum_7d_negative":
+            ok = momentum_7d < 0
+        elif cond_name == "price_above_ma200":
+            ok = ma200 is not None and price > ma200
+        elif cond_name == "price_below_ma200":
+            ok = ma200 is not None and price < ma200
+        elif cond_name == "close_below_MA200":
+            ok = ma200 is not None and price < ma200
+        if ok:
+            matched += 1
+    
+    return matched, total
+
+            matched += 1
+    
+    return matched, total
+
+
+def find_trigger_candle(strategy: dict, daily: list, h4: list, preferred_direction: str = None) -> dict | None:
+    """往回找策略條件第一次 ALL 滿足的那根 K線（最多回看 60 根）。"""
+    entry = strategy.get("entry", {})
+    tf = strategy.get("timeframe", "1D")
+    klines = daily if tf == "1D" else h4
+    
+    short_conds = entry.get("short", {})
+    long_conds = entry.get("long", {})
+    
+    for i in range(len(klines) - 1, max(len(klines) - 60, 0), -1):
+        if preferred_direction != "SHORT" and long_conds:
+            m, t = _eval_at_candle(i, long_conds, daily, h4, tf)
+            if m == t and t > 0:
+                return {"candle": klines[i], "direction": "LONG", "trigger_index": i}
+        
+        if preferred_direction != "LONG" and short_conds:
+            m, t = _eval_at_candle(i, short_conds, daily, h4, tf)
+            if m == t and t > 0:
+                return {"candle": klines[i], "direction": "SHORT", "trigger_index": i}
+    
+    return None
+
+
+
+def _compute_entry_tp_sl(strategy: dict, ind: dict, entry_price: float, direction: str = "LONG") -> dict:
+    """計算進場價、止盈價、止損價"""
+    result = {
+        "entry_price": round(entry_price, 2),
+        "stop_loss": None,
+        "take_profit": None,
+        "sl_pct": None,
+        "tp_pct": None,
+        "tp_sl_ratio": None,
+        "risk_reward": None,
+        "tp_note": None,
+    }
+
+    result = {
+        "entry_price": round(entry_price, 2),
+        "stop_loss": None,
+        "take_profit": None,
+        "sl_pct": None,
+        "tp_pct": None,
+        "tp_sl_ratio": None,
+        "risk_reward": None,
+        "tp_note": None,
+    }
+
+    sl = strategy.get("stop_loss", "")
+    tp = strategy.get("take_profit", "")
+    timeframe = strategy.get("timeframe", "1D")
+
+    # 止損計算
+    if "ATR" in sl:
+        # e.g., "2.0 ATR" or "1.5 ATR"
+        m = re.search(r"([\d.]+)\s*ATR", sl)
+        if m:
+            mult = float(m.group(1))
+            atr = ind.get("atr_14_4h", 700) if timeframe == "4H" else ind.get("atr_14", 2600)
+            if direction == "LONG":
+                result["stop_loss"] = round(entry_price - atr * mult, 2)
+            else:
+                result["stop_loss"] = round(entry_price + atr * mult, 2)
+            result["sl_pct"] = round(atr * mult / entry_price * 100, 2)
+    elif "%" in sl:
+        m = re.search(r"([\d.]+)%", sl)
+        if m:
+            pct = float(m.group(1)) / 100
+            if direction == "LONG":
+                result["stop_loss"] = round(entry_price * (1 - pct), 2)
+            else:
+                result["stop_loss"] = round(entry_price * (1 + pct), 2)
+            result["sl_pct"] = round(pct * 100, 2)
+
+    # 止盈計算
+    if "ATR trailing" in tp or "trailing" in tp.lower():
+        result["take_profit"] = "ATR trailing (EMA cross exit)"
+        result["tp_note"] = "移動止盈，跟蹤趨勢直到 EMA 反轉"
+    elif "ATR" in tp:
+        m = re.search(r"([\d.]+)\s*ATR", tp)
+        if m:
+            mult = float(m.group(1))
+            atr = ind.get("atr_14_4h", 700) if timeframe == "4H" else ind.get("atr_14", 2600)
+            if direction == "LONG":
+                result["take_profit"] = round(entry_price + atr * mult, 2)
+            else:
+                result["take_profit"] = round(entry_price - atr * mult, 2)
+            result["tp_pct"] = round(atr * mult / entry_price * 100, 2)
+    elif "%" in tp:
+        m = re.search(r"([\d.]+)%", tp)
+        if m:
+            pct = float(m.group(1)) / 100
+            if direction == "LONG":
+                result["take_profit"] = round(entry_price * (1 + pct), 2)
+            else:
+                result["take_profit"] = round(entry_price * (1 - pct), 2)
+            result["tp_pct"] = round(pct * 100, 2)
+
+    # Risk/Reward
+    if result["stop_loss"] and result["take_profit"]:
+        risk = abs(entry_price - result["stop_loss"])
+        reward = abs(result["take_profit"] - entry_price)
+        if risk > 0:
+            result["risk_reward"] = round(reward / risk, 2)
+            result["tp_sl_ratio"] = f"RR 1:{result['risk_reward']}"
+
+    return result
+
+async def compute_btc_indicators() -> dict:
+    """計算 BTC 主要指標"""
+    daily = await binance_client.get_klines("BTCUSDT", "1d", limit=250)
+    h4 = await binance_client.get_klines("BTCUSDT", "4h", limit=200)
+
+    closes_d = [float(k["close"]) for k in daily]
+    closes_4h = [float(k["close"]) for k in h4]
+
+    # MA
+    ma20_d = sum(closes_d[-20:]) / 20
+    ma50_d = sum(closes_d[-50:]) / 50
+    ma200_d = sum(closes_d[-200:]) / 200
+
+    # Golden/Death cross
+    golden_cross = ma20_d > ma50_d
+    death_cross = ma20_d < ma50_d
+
+    # Price vs MA200
+    price_above_ma200 = closes_d[-1] > ma200_d
+    price_below_ma200 = closes_d[-1] < ma200_d
+
+    # RSI (14)
+    deltas = [closes_d[i] - closes_d[i-1] for i in range(1, len(closes_d))]
+    gains = [d for d in deltas[-14:] if d > 0]
+    losses = [-d for d in deltas[-14:] if d < 0]
+    avg_gain = sum(gains)/14 if gains else 0
+    avg_loss = sum(losses)/14 if losses else 0
+    rs = avg_gain/avg_loss if avg_loss else 100
+    rsi = 100 - (100/(1+rs))
+
+    # Momentum (7-day % change)
+    momentum_7d = (closes_d[-1] - closes_d[-8]) / closes_d[-8] * 100 if len(closes_d) >= 8 else 0
+
+    # Regime (if MA200 > MA50 = bull, else bear)
+    regime_bull = ma200_d > ma50_d
+    regime_bear = ma200_d < ma50_d
+
+    # 4H RSI (for 4H strategies)
+    closes_4h_d = [float(k["close"]) for k in h4]
+    deltas_4h = [closes_4h_d[i] - closes_4h_d[i-1] for i in range(1, len(closes_4h_d))]
+    gains_4h = [d for d in deltas_4h[-14:] if d > 0]
+    losses_4h = [-d for d in deltas_4h[-14:] if d < 0]
+    avg_gain_4h = sum(gains_4h)/14 if gains_4h else 0
+    avg_loss_4h = sum(losses_4h)/14 if losses_4h else 0
+    rs_4h = avg_gain_4h/avg_loss_4h if avg_loss_4h else 100
+    rsi_4h = 100 - (100/(1+rs_4h))
+
+    # EMA 4H (EMA9 vs EMA21 for 4H strategy)
+    def calc_ema(closes, period):
+        k = 2 / (period + 1)
+        ema = closes[0]
+        for c in closes[1:]:
+            ema = c * k + ema * (1 - k)
+        return ema
+    ema9_4h = calc_ema(closes_4h_d, 9)
+    ema21_4h = calc_ema(closes_4h_d, 21)
+    ema9_4h_above = ema9_4h > ema21_4h
+    ema9_4h_below = ema9_4h < ema21_4h
+
+    # EMA 1D (EMA8 vs EMA40 for 1D strategy)
+    ema8_1d = calc_ema(closes_d, 8)
+    ema40_1d = calc_ema(closes_d, 40)
+    ema8_1d_above = ema8_1d > ema40_1d
+    ema8_1d_below = ema8_1d < ema40_1d
+
+    # ATR (14) — 用於 ATR-based SL/TP
+    highs_d = [float(k.get("high", 0)) for k in daily]
+    lows_d = [float(k.get("low", 0)) for k in daily]
+    trs = []
+    for i in range(1, len(daily)):
+        tr = max(
+            highs_d[i] - lows_d[i],
+            abs(highs_d[i] - closes_d[i-1]),
+            abs(lows_d[i] - closes_d[i-1])
+        )
+        trs.append(tr)
+    atr_14 = sum(trs[-14:]) / 14 if len(trs) >= 14 else 0
+
+    # 4H ATR
+    highs_4h = [float(k.get("high", 0)) for k in h4]
+    lows_4h = [float(k.get("low", 0)) for k in h4]
+    closes_4h_list = [float(k["close"]) for k in h4]
+    trs_4h = []
+    for i in range(1, len(h4)):
+        tr = max(
+            highs_4h[i] - lows_4h[i],
+            abs(highs_4h[i] - closes_4h_list[i-1]),
+            abs(lows_4h[i] - closes_4h_list[i-1])
+        )
+        trs_4h.append(tr)
+    atr_14_4h = sum(trs_4h[-14:]) / 14 if len(trs_4h) >= 14 else 0
+
+    return {
+        "price": closes_d[-1],
+        "ma20": ma20_d, "ma50": ma50_d, "ma200": ma200_d,
+        "golden_cross": golden_cross, "death_cross": death_cross,
+        "price_above_ma200": price_above_ma200, "price_below_ma200": price_below_ma200,
+        "rsi": rsi, "rsi_4h": rsi_4h,
+        "momentum_7d": momentum_7d,
+        "regime_bull": regime_bull, "regime_bear": regime_bear,
+        "ema9_4h_above": ema9_4h_above, "ema9_4h_below": ema9_4h_below,
+        "ema8_1d_above": ema8_1d_above, "ema8_1d_below": ema8_1d_below,
+        "rsi_above_55": rsi > 55,
+        "rsi_above_50": rsi > 50,
+        "rsi_below_50": rsi < 50,
+        "rsi_below_45": rsi < 45,
+        "rsi_below_48": rsi < 48,
+        "rsi_4h_above_50": rsi_4h > 50,
+        "rsi_4h_in_55_70": 55 < rsi_4h < 70,
+        "momentum_7d_above_0.5": momentum_7d > 0.5,
+        "momentum_7d_below_minus0.5": momentum_7d < -0.5,
+        "momentum_7d_negative": momentum_7d < 0,
+        "atr_14": atr_14,
+        "atr_14_4h": atr_14_4h,
+        # 回傳 K線供 find_trigger_candle 使用
+        "_daily": daily,
+        "_h4": h4,
+    }
+
+
+def _match_strategy(strategy: dict, ind: dict) -> dict:
+    """計算單一策略的符合程度"""
+    s_id = strategy.get("factor_id", "")
+    name = strategy.get("name", "")
+    entry = strategy.get("entry", {})
+    timeframe = strategy.get("timeframe", "1D")
+
+    # 根據 timeframe 決定用哪組 RSI
+    use_4h = timeframe == "4H"
+
+    # 決定進場方向：同時有 long/short 取 direction 參數或只看 long
+    long_conds = entry.get("long", {})
+    short_conds = entry.get("short", {})
+
+    results = []
+
+    # LONG 方向
+    if long_conds:
+        matched, total, matched_list = _check_conditions(long_conds, ind, use_4h)
+        pct = round(matched / total * 100) if total > 0 else 0
+        confidence = _get_confidence(pct)
+        direction = "LONG"
+        signal = "BUY" if pct >= 50 else "WAIT"
+        results.append({
+            "strategy_id": s_id, "name": name,
+            "direction": direction, "timeframe": timeframe,
+            "matched_conditions": matched_list,
+            "total_conditions": total,
+            "matched": matched,
+            "match_pct": pct,
+            "signal": signal, "confidence": confidence,
+        })
+
+    # SHORT 方向
+    if short_conds:
+        matched, total, matched_list = _check_conditions(short_conds, ind, use_4h)
+        pct = round(matched / total * 100) if total > 0 else 0
+        confidence = _get_confidence(pct)
+        direction = "SHORT"
+        signal = "SELL" if pct >= 50 else "WAIT"
+        results.append({
+            "strategy_id": s_id, "name": name,
+            "direction": direction, "timeframe": timeframe,
+            "matched_conditions": matched_list,
+            "total_conditions": total,
+            "matched": matched,
+            "match_pct": pct,
+            "signal": signal, "confidence": confidence,
+        })
+
+    # 回傳 match_pct 最高的結果
+    return max(results, key=lambda x: x["match_pct"]) if results else None
+
+
+def _check_conditions(conds: dict, ind: dict, use_4h: bool) -> tuple:
+    """檢查策略條件，返回 (matched_count, total_count, [matched_condition_names])"""
+    matched = 0
+    total = 0
+    matched_list = []
+
+    for cond_name, cond_value in conds.items():
+        if not cond_value:
+            continue
+        total += 1
+        ok = False
+
+        if cond_name == "golden_cross":
+            ok = ind["golden_cross"]
+        elif cond_name == "death_cross":
+            ok = ind["death_cross"]
+        elif cond_name == "rsi_above_55":
+            ok = ind["rsi_above_55"]
+        elif cond_name == "rsi_above_50":
+            ok = ind["rsi_above_50"]
+        elif cond_name == "rsi_below_45":
+            ok = ind["rsi_below_45"]
+        elif cond_name == "rsi_below_48":
+            ok = ind["rsi_below_48"]
+        elif cond_name == "rsi_below_50":
+            ok = ind["rsi_below_50"]
+        elif cond_name == "momentum_7d_above_0.5pct":
+            ok = ind["momentum_7d_above_0.5"]
+        elif cond_name == "momentum_7d_below_minus0.5pct":
+            ok = ind["momentum_7d_below_minus0.5"]
+        elif cond_name == "momentum_7d_negative":
+            ok = ind["momentum_7d_negative"]
+        elif cond_name == "price_above_ma200":
+            ok = ind["price_above_ma200"]
+        elif cond_name == "price_below_ma200":
+            ok = ind["price_below_ma200"]
+        elif cond_name == "regime_bull":
+            ok = ind["regime_bull"]
+        elif cond_name == "regime_bear":
+            ok = ind["regime_bear"]
+        elif cond_name == "RSI_55_to_70":
+            ok = ind["rsi_4h_in_55_70"]
+        elif cond_name == "RSI_above_50":
+            # 1D strategy uses 1D RSI; 4H strategy uses 4H RSI
+            ok = ind["rsi_above_50"] if not use_4h else ind["rsi_4h_above_50"]
+        elif cond_name == "RSI_below_50":
+            ok = ind["rsi_below_50"] if not use_4h else ind["rsi_4h_above_50"] is False  # simplified
+        elif cond_name == "RSI_below_45":
+            ok = ind["rsi_below_45"]
+        elif cond_name == "EMA9_cross_above_EMA21":
+            ok = ind["ema9_4h_above"]
+        elif cond_name == "EMA9_cross_below_EMA21":
+            ok = ind["ema9_4h_below"]
+        elif cond_name == "EMA8_cross_above_EMA40":
+            ok = ind["ema8_1d_above"]
+        elif cond_name == "EMA8_cross_below_EMA40":
+            ok = ind["ema8_1d_below"]
+        elif cond_name == "EMA10_cross_above_EMA15":
+            # Not in our simplified indicators, skip gracefully
+            ok = ind.get("ema9_4h_above", False)
+        elif cond_name == "EMA10_cross_below_EMA15":
+            ok = ind.get("ema9_4h_below", False)
+        elif cond_name == "SMA20_cross_below_SMA50":
+            ok = ind["death_cross"]
+        elif cond_name == "close_below_MA200":
+            ok = ind["price_below_ma200"]
+        elif cond_name == "MA200_slope_negative":
+            # Approximate: regime_bear when ma200 < ma50
+            ok = ind["regime_bear"]
+        elif cond_name == "volume_above_ma20":
+            # Volume check - not computed in simplified version
+            ok = True  # neutral
+        elif cond_name == "RSI_16_above_50":
+            ok = ind["rsi_4h_above_50"]
+        elif cond_name == "RSI_16_below_50":
+            ok = ind["rsi_4h_above_50"] is False
+
+        if ok:
+            matched += 1
+            matched_list.append(cond_name)
+
+    return matched, total, matched_list
+
+
+def _get_confidence(pct: int) -> str:
+    if pct >= 90: return "STRONG"
+    if pct >= 70: return "HIGH"
+    if pct >= 50: return "MEDIUM"
+    return "LOW"
+
+
+@app.get("/api/strategies/live")
+async def get_live_strategy_matches():
+    """
+    即時策略符合度計算
+    - 從 factor_library.json 讀取已驗證的策略
+    - 取得 BTC 即時指標
+    - 計算每個策略的條件符合程度
+    """
+    try:
+        lib_path = os.path.join(os.path.dirname(__file__), "autoresearch", "factor_library.json")
+        with open(lib_path) as f:
+            library = json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load factor_library: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load strategy library")
+
+    # 只取 verified 策略
+    verified = [s for s in library if s.get("status") == "verified"]
+    if not verified:
+        verified = library[:5]
+
+    # 計算指標
+    try:
+        ind = await compute_btc_indicators()
+    except Exception as e:
+        logger.error(f"Failed to compute BTC indicators: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch market data")
+
+    # 每個策略計算符合度
+    daily = ind.get("_daily", [])
+    h4 = ind.get("_h4", [])
+    strategies_result = []
+    for s in verified:
+        result = _match_strategy(s, ind)
+        if result:
+            # 建 reason 字串
+            matched = result["matched"]
+            total = result["total_conditions"]
+            pct = result["match_pct"]
+            conds_str = ", ".join([f"{c} ✓" for c in result["matched_conditions"]])
+            result["reason"] = f"{matched}/{total} 條件符合：{conds_str}" if conds_str else f"{matched}/{total} 條件符合"
+            # 找觸發燭臺（往回找策略條件第一次 ALL 滿足時的價格）
+            chosen_dir = result["direction"]  # LONG 或 SHORT（來自 _match_strategy）
+            trigger = find_trigger_candle(s, daily, h4, preferred_direction=chosen_dir)
+            if trigger:
+                trigger_entry_price = float(trigger["candle"]["close"])
+                result["trigger_direction"] = trigger["direction"]  # 明確記錄觸發時的方向
+            else:
+                trigger_entry_price = ind["price"]  # 沒找到 → 用現價
+                result["trigger_direction"] = "CURRENT"
+            # 計算進場/止盈/止損價位（用觸發價格當進場價）
+            ets = _compute_entry_tp_sl(s, ind, trigger_entry_price, chosen_dir)
+            result["entry_price"] = ets["entry_price"]
+            result["stop_loss"] = ets["stop_loss"]
+            result["take_profit"] = ets["take_profit"]
+            result["sl_pct"] = ets["sl_pct"]
+            result["tp_pct"] = ets["tp_pct"]
+            result["tp_sl_ratio"] = ets["tp_sl_ratio"]
+            result["risk_reward"] = ets["risk_reward"]
+            result["tp_note"] = ets["tp_note"]
+            # 新增：觸發方向
+            result["trigger_direction"] = chosen_dir
+            strategies_result.append(result)
+
+    # 按 match_pct 降序
+    strategies_result.sort(key=lambda x: x["match_pct"], reverse=True)
+
+    return {
+        "btc_price": ind["price"],
+        "indicators": {
+            "price": round(ind["price"], 2),
+            "rsi": round(ind["rsi"], 2),
+            "rsi_4h": round(ind["rsi_4h"], 2),
+            "ma20": round(ind["ma20"], 2),
+            "ma50": round(ind["ma50"], 2),
+            "ma200": round(ind["ma200"], 2),
+            "golden_cross": ind["golden_cross"],
+            "death_cross": ind["death_cross"],
+            "price_above_ma200": ind["price_above_ma200"],
+            "price_below_ma200": ind["price_below_ma200"],
+            "rsi_above_55": ind["rsi_above_55"],
+            "rsi_above_50": ind["rsi_above_50"],
+            "rsi_below_50": ind["rsi_below_50"],
+            "rsi_below_45": ind["rsi_below_45"],
+            "momentum_7d": round(ind["momentum_7d"], 2),
+            "regime_bull": ind["regime_bull"],
+            "regime_bear": ind["regime_bear"],
+            "ema9_4h_above": ind["ema9_4h_above"],
+            "ema8_1d_above": ind["ema8_1d_above"],
+            "atr_14": round(ind.get("atr_14", 0), 2),
+            "atr_14_4h": round(ind.get("atr_14_4h", 0), 2),
+        },
+        "strategies": strategies_result,
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+@app.get("/api/strategies/all")
+async def get_all_strategies_endpoint():
+    """
+    取得所有研究過的策略（含實驗數據 + factor_library，已套用 tier 分層，5 分鐘快取）
+    
+    回傳格式：
+    [{
+      "strategy_id": "MACrossoverStrategy",
+      "name": "MACrossoverStrategy",
+      "timeframe": "1D",
+      "source": "experiment|library",
+      "win_rate": 33.0,
+      "profit_factor": 1.49,
+      "max_drawdown": 13.5,
+      "sharpe": 5.08,
+      "total_trades": 30,
+      "status": "discard|success",
+      "tier": "STANDARD|RELAXED_PF_3|RELAXED_SHARPE_3|DISCARD",
+      "params": {...}
+    }, ...]
+    
+    只取 top 50（按 Sharpe 降序）
+    """
+    strategies_data = _get_cached_all_strategies()
+    return {
+        "strategies": strategies_data,
+        "count": len(strategies_data),
+        "tier_summary": {
+            "STANDARD": sum(1 for s in strategies_data if s.get("tier") == "STANDARD"),
+            "RELAXED_PF_3": sum(1 for s in strategies_data if s.get("tier") == "RELAXED_PF_3"),
+            "RELAXED_SHARPE_3": sum(1 for s in strategies_data if s.get("tier") == "RELAXED_SHARPE_3"),
+            "DISCARD": sum(1 for s in strategies_data if s.get("tier") == "DISCARD"),
+        },
+        "from_cache": (
+            _all_strategies_cache.get("_data", {}).get("ts", 0) > 0
+            and (_time.time() - _all_strategies_cache["_data"]["ts"]) < _ALL_STRATEGIES_CACHE_TTL
+        ),
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+# ─── 情緒 API 快取（5 分鐘 TTL）───────────────────────────────────────────────
+import time as _time
+
+_sentiment_cache: dict[str, dict] = {}
+_SENTIMENT_CACHE_TTL = 300  # 5 minutes
+
+
+# ─── 策略列表快取（5 分鐘 TTL）────────────────────────────────────────────────
+_ALL_STRATEGIES_CACHE_TTL = 300  # 5 minutes
+_all_strategies_cache: dict[str, Any] = {}
+
+
+def _classify_tier(wr: float, pf: float, dd: float, sharpe: float) -> str:
+    """
+    根據分層門檻計算策略 tier 等級
+    
+    - STANDARD:      WR≥50%, PF≥2.0, DD≤30%, Sharpe≥1.5（全部滿足）
+    - RELAXED_PF_3:  WR≥40%, PF≥3.0（不通過 STANDARD 但 PF 突出）
+    - RELAXED_SHARPE_3: WR≥40%, Sharpe≥3.0（不通過 STANDARD 但 Sharpe 突出）
+    - DISCARD:       其他
+    """
+    # Layer 1 - 標準組合（全部滿足）
+    if wr >= 50 and pf >= 2.0 and dd <= 30 and sharpe >= 1.5:
+        return "STANDARD"
+    
+    # Layer 3 絕對底線（不通過則直接 DISCARD）
+    if wr < 35 or pf < 1.0 or dd > 50 or sharpe < 0.5:
+        return "DISCARD"
+    
+    # Layer 2 放寬組合（任一條件滿足即可）
+    if wr >= 40 and pf >= 3.0:
+        return "RELAXED_PF_3"
+    
+    if wr >= 40 and sharpe >= 3.0:
+        return "RELAXED_SHARPE_3"
+    
+    return "DISCARD"
+
+
+def _load_all_strategies_data() -> list[dict]:
+    """載入所有實驗 + factor_library 策略，計算 tier，回傳完整列表"""
+    base_dir = os.path.join(os.path.dirname(__file__), "autoresearch")
+    experiments_dir = os.path.join(base_dir, "experiments")
+    factor_library_path = os.path.join(base_dir, "factor_library.json")
+    
+    # ── 1. 讀取所有實驗檔，去重（取最高 PF）──────────────────────────────────
+    strategy_best: dict[str, dict] = {}  # strategy_name -> best experiment data
+    
+    if os.path.isdir(experiments_dir):
+        for fname in os.listdir(experiments_dir):
+            if not fname.startswith("exp_") or not fname.endswith(".json"):
+                continue
+            fpath = os.path.join(experiments_dir, fname)
+            try:
+                with open(fpath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                continue
+            
+            m = data.get("metrics", {})
+            pf = m.get("profit_factor", 0) or 0
+            # win_rate in experiment files is already a ratio (0.33); convert to %
+            wr_raw = m.get("win_rate", 0) or 0
+            wr = wr_raw * 100 if wr_raw <= 1.0 else wr_raw
+            
+            name = data.get("strategy_name", "")
+            if not name:
+                continue
+            
+            # 只保留更高的 PF
+            existing = strategy_best.get(name)
+            if existing is None or pf > existing.get("profit_factor", 0):
+                strategy_best[name] = {
+                    "strategy_id": name,
+                    "name": name,
+                    "timeframe": m.get("timeframe", "1D"),
+                    "source": "experiment",
+                    "win_rate": round(wr, 2),
+                    "profit_factor": round(pf, 2),
+                    "max_drawdown": round(m.get("max_drawdown_pct", 0) or 0, 2),
+                    "sharpe": round(m.get("sharpe_ratio", 0) or 0, 2),
+                    "total_trades": int(m.get("total_trades", 0) or 0),
+                    "status": data.get("status", "discard"),
+                    "params": data.get("params", {}),
+                }
+    
+    # ── 2. 合併 factor_library 中的已驗證策略 ───────────────────────────────
+    if os.path.isfile(factor_library_path):
+        try:
+            with open(factor_library_path, "r", encoding="utf-8") as f:
+                library = json.load(f)
+            for item in library:
+                m = item.get("metrics", {})
+                # Library metrics are already in percentage form (71.43)
+                wr = m.get("win_rate", 0) or 0
+                pf = m.get("profit_factor", 0) or 0
+                dd = m.get("max_drawdown", 0) or 0
+                sharpe_val = m.get("sharpe", 0) or 0
+                
+                name = item.get("name", "") or item.get("strategy_id", "")
+                if not name:
+                    continue
+                
+                # Library strategies always have better PF than experiments; always include
+                strategy_best[name] = {
+                    "strategy_id": item.get("factor_id", name),
+                    "name": name,
+                    "timeframe": item.get("timeframe", "1D"),
+                    "source": "library",
+                    "win_rate": round(wr, 2),
+                    "profit_factor": round(pf, 2),
+                    "max_drawdown": round(dd, 2),
+                    "sharpe": round(sharpe_val, 2),
+                    "total_trades": int(m.get("total_trades", 0) or 0),
+                    "status": item.get("status", "verified"),
+                    "params": item.get("entry", {}),
+                }
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"Could not load factor_library.json: {e}")
+    
+    # ── 3. 計算 tier ─────────────────────────────────────────────────────────
+    results = []
+    for s in strategy_best.values():
+        tier = _classify_tier(
+            s["win_rate"], s["profit_factor"], s["max_drawdown"], s["sharpe"]
+        )
+        s["tier"] = tier
+        results.append(s)
+    
+    # ── 4. 按 Sharpe 降序，只取 top 50 ────────────────────────────────────────
+    results.sort(key=lambda x: x.get("sharpe", 0), reverse=True)
+    return results[:50]
+
+
+def _get_cached_all_strategies() -> list[dict]:
+    """從快取取得所有策略（若未過期）"""
+    entry = _all_strategies_cache.get("_data")
+    if entry and (_time.time() - entry["ts"]) < _ALL_STRATEGIES_CACHE_TTL:
+        return entry["data"]
+    data = _load_all_strategies_data()
+    _all_strategies_cache["_data"] = {"data": data, "ts": _time.time()}
+    return data
+
+
+def _get_cached_sentiment(symbol: str):
+    """從記憶體快取取得情緒資料（若未過期）"""
+    if symbol in _sentiment_cache:
+        entry = _sentiment_cache[symbol]
+        if _time.time() - entry["ts"] < _SENTIMENT_CACHE_TTL:
+            return entry["data"]
+    return None
+
+
+def _set_cached_sentiment(symbol: str, data: dict):
+    """寫入情緒資料到記憶體快取"""
+    _sentiment_cache[symbol] = {"data": data, "ts": _time.time()}
+
+
+# ─── 新增 API 端點 ────────────────────────────────────────────────────────────
+
+@app.get("/api/rankings")
+async def get_rankings():
+    """取得策略排行榜"""
+    try:
+        ranker = get_ranking_service()
+        return ranker.get_rankings()
+    except Exception as e:
+        logger.error(f"Rankings error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/rankings/{strategy}")
+async def get_strategy_equity(strategy: str):
+    """取得特定策略的 equity curve"""
+    try:
+        ranker = get_ranking_service()
+        data = ranker.get_equity_curve(strategy)
+        if data is None:
+            raise HTTPException(status_code=404, detail=f"Strategy '{strategy}' not found")
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Equity curve error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/sentiment/{symbol}")
+async def get_sentiment(symbol: str = "BTC"):
+    """取得幣種情緒指數（自訂 5 分鐘快取）"""
+    sym = symbol.upper()
+
+    # 嘗試從快取取得
+    cached = _get_cached_sentiment(sym)
+    if cached is not None:
+        cached["_from_cache"] = True
+        return cached
+
+    try:
+        # 使用真實 API（非 mock 模式）
+        # Twitter/Nitter 若失敗會優雅降級
+        config = SentimentConfig(mock_mode=False)
+        agg = SentimentAggregator(config)
+        try:
+            result = await asyncio.wait_for(agg.get_sentiment(sym), timeout=5.0)
+        finally:
+            await agg.close()
+        data = result.to_dict()
+        data["_from_cache"] = False
+
+        # 寫入快取
+        _set_cached_sentiment(sym, data)
+        return data
+    except asyncio.TimeoutError:
+        logger.warning(f"Sentiment timeout for {sym}")
+        raise HTTPException(status_code=504, detail="情緒資料取得超時")
+    except Exception as e:
+        logger.error(f"Sentiment error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/price/{symbol}")
+async def get_price(symbol: str = "BTCUSDT"):
+    """直接從幣安取得現價"""
+    try:
+        price = await binance_client.get_symbol_price(symbol.upper())
+        if price is None:
+            raise HTTPException(status_code=500, detail="Failed to get price from Binance")
+        return {"symbol": symbol.upper(), "price": price}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── K線資料快取（5 分鐘 TTL）────────────────────────────────────────────────
+_klines_cache: dict[str, dict] = {}
+_KLINES_CACHE_TTL = 30   # 30 seconds (dev)
+
+
+def _get_cached_klines(symbol: str, interval: str):
+    """從記憶體快取取得 K 線資料（若未過期）"""
+    key = f"{symbol}:{interval}"
+    if key in _klines_cache:
+        entry = _klines_cache[key]
+        if _time.time() - entry["ts"] < _KLINES_CACHE_TTL:
+            return entry["data"]
+    return None
+
+
+def _set_cached_klines(symbol: str, interval: str, data: list):
+    """寫入 K 線資料到記憶體快取"""
+    key = f"{symbol}:{interval}"
+    _klines_cache[key] = {"data": data, "ts": _time.time()}
+
+
+@app.get("/api/klines")
+async def get_klines(symbol: str, interval: str = "1d", limit: int = 100):
+    """取得 K 線數據用於圖表顯示
+    
+    Args:
+        symbol: 交易對，如 "BTC", "ETH" (不含 USDT)
+        interval: K 線周期，如 "1d", "4h", "15m"
+        limit: 數量上限
+    """
+    sym = symbol.upper() + "USDT"
+    
+    # 支援的時間框架
+    valid_tfs = {"1d": "1d", "4h": "4h", "15m": "15m"}
+    interval_mapped = valid_tfs.get(interval, "1d")
+    
+    # 嘗試從快取取得
+    cached = _get_cached_klines(sym, interval_mapped)
+    if cached is not None:
+        return cached
+    
+    try:
+        klines = await binance_client.get_klines(sym, interval_mapped, limit=limit)
+        if not klines:
+            raise HTTPException(status_code=404, detail=f"No kline data for {sym}")
+        
+        # 轉換為 Lightweight Charts 格式
+        result = []
+        for k in klines:
+            # open_time 可能是 datetime 或 int
+            ts = k["open_time"]
+            if isinstance(ts, datetime):
+                ts = int(ts.timestamp())
+            elif hasattr(ts, 'timestamp'):
+                ts = int(ts.timestamp())
+            
+            result.append({
+                "time": ts,
+                "open": k["open"],
+                "high": k["high"],
+                "low": k["low"],
+                "close": k["close"],
+                "volume": k.get("volume"),  # 成交量
+            })
+        
+        # 寫入快取
+        _set_cached_klines(sym, interval_mapped, result)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Klines error for {sym}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Top 20 幣種追蹤 ─────────────────────────────────────────────────────────
+
+async def get_24h_change(symbol: str) -> float:
+    """從幣安取得 24 小時價格變化百分比"""
+    try:
+        data = await binance_client._make_request(
+            "/api/v3/ticker/24hr",
+            {"symbol": symbol.upper()}
+        )
+        return float(data.get("priceChangePercent", 0))
+    except Exception as e:
+        logger.error(f"Failed to get 24h change for {symbol}: {e}")
+        return 0.0
+
+
+def compute_signal(change_24h: float, confidence: float) -> tuple[str, str]:
+    """根據價格變化和信心指數計算訊號"""
+    if change_24h >= 3 and confidence >= 70:
+        return "BUY", "signal-strong"
+    elif change_24h >= 1.5 and confidence >= 55:
+        return "BUY", "signal-medium"
+    elif change_24h <= -3 and confidence >= 70:
+        return "SELL", "signal-strong"
+    elif change_24h <= -1.5 and confidence >= 55:
+        return "SELL", "signal-medium"
+    else:
+        return "HOLD", "signal-weak"
+
+
+def get_trend_label(change_24h: float) -> str:
+    """根據 24h 變化回傳趨勢文字和 emoji"""
+    if change_24h >= 5:
+        return "🚀 強勢上漲"
+    elif change_24h >= 2:
+        return "📈 上漲趨勢"
+    elif change_24h >= 0:
+        return "↗️ 輕微上漲"
+    elif change_24h >= -2:
+        return "↘️ 輕微下跌"
+    elif change_24h >= -5:
+        return "📉 下跌趨勢"
+    else:
+        return "💥 強勢下跌"
+
+
+TOP_COINS = [
+    "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
+    "ADAUSDT", "DOGEUSDT", "DOTUSDT", "AVAXUSDT", "LINKUSDT",
+    "LTCUSDT", "UNIUSDT", "ATOMUSDT", "XLMUSDT", "ETCUSDT",
+    "FILUSDT", "APTUSDT", "ARBUSDT"
+]
+
+
+@app.get("/api/topcoins")
+async def get_top_coins():
+    """一次返回所有 Top 20 幣種的即時數據（並發優化）"""
+    import random
+
+    # 並發取得所有幣種的現價
+    price_tasks = [binance_client.get_symbol_price(sym) for sym in TOP_COINS]
+    change_tasks = [get_24h_change(sym) for sym in TOP_COINS]
+
+    # asyncio.gather 並發執行：prices 和 changes 同時抓
+    all_prices, all_changes = await asyncio.gather(
+        asyncio.gather(*price_tasks),
+        asyncio.gather(*change_tasks)
+    )
+
+    results = []
+    for i, sym in enumerate(TOP_COINS):
+        try:
+            price = all_prices[i]
+            change_24h = all_changes[i]
+            if price is None:
+                continue
+
+            # Mock confidence based on change magnitude (replace with AI analyst later)
+            confidence = min(95, max(30, 50 + abs(change_24h) * 3 + random.uniform(-5, 5)))
+
+            signal, signal_class = compute_signal(change_24h, confidence)
+            trend = get_trend_label(change_24h)
+
+            results.append({
+                "symbol": sym.replace("USDT", ""),
+                "price": round(price, 4) if price < 1 else round(price, 2),
+                "change_24h": round(change_24h, 2),
+                "signal": signal,
+                "signal_class": signal_class,
+                "confidence": round(confidence, 1),
+                "trend": trend
+            })
+        except Exception as e:
+            logger.error(f"Error fetching {sym}: {e}")
+            continue
+
+    return results
+
+
+@app.get("/api/anomalies/all")
+async def get_all_anomalies():
+    """掃描所有 20 檔幣種的異常"""
+    all_anomalies = []
+    
+    for sym in TOP_COINS:
+        try:
+            anomalies = await detect_anomalies(sym)
+            if anomalies.get("anomalies"):
+                all_anomalies.append({
+                    "symbol": sym.replace("USDT", ""),
+                    "anomalies": anomalies["anomalies"]
+                })
+        except Exception as e:
+            logger.error(f"Error scanning {sym}: {e}")
+            continue
+
+
+async def _check_one_volume(sym: str) -> dict | None:
+    """並行檢查單一幣種的成交量異常（永遠回傳結果，無異常時也回傳統計）"""
+    try:
+        klines = await binance_client.get_klines(sym.upper(), "1d", limit=20)
+        if not klines or len(klines) < 7:
+            return None
+        volumes = [float(k.get("volume", 0)) for k in klines]
+        yesterday_vol = volumes[-2]
+        hist_vols = volumes[-7:-2]
+        if not hist_vols:
+            return None
+        avg_hist = sum(hist_vols) / len(hist_vols)
+        ratio = yesterday_vol / avg_hist if avg_hist > 0 else 0
+        is_anomaly = ratio > 3
+        return {
+            "symbol": sym.replace("USDT", ""),
+            "today_volume": round(yesterday_vol, 2),
+            "avg_volume": round(avg_hist, 2),
+            "ratio": round(ratio, 2),
+            "is_anomaly": is_anomaly,
+            "severity": "critical" if ratio > 5 else ("warning" if is_anomaly else "normal"),
+            "emoji": "🚨" if ratio > 5 else ("⚠️" if is_anomaly else "✅"),
+            "time": datetime.now().strftime("%H:%M:%S"),
+        }
+    except Exception as e:
+        logger.warning(f"Volume anomaly check failed for {sym}: {e}")
+    return None
+
+
+@app.get("/api/dashboard/anomalies")
+async def get_dashboard_anomalies():
+    """儀表板專用：成交量異常 + 掛單異常（一次性返回）"""
+    # ── 0. 先背景更新所有訂單簿 ─────────────────────────────────────────────
+    await _update_order_book_for_all()
+
+    # ── 1. 成交量異常（使用日K，過去 N 日平均 × 倍數）─── asyncio.gather 並行
+    results = await asyncio.gather(*[_check_one_volume(sym) for sym in TOP_COINS])
+    vol_anomalies = sorted([r for r in results if r], key=lambda x: x["ratio"], reverse=True)
+    
+    # ── 2. 掛單統計（所有幣種的 avg vs current）────────────────────────────
+    import time as _time
+    ob_anomalies = []
+    for sym in TOP_COINS:
+        base = sym.replace("USDT", "")
+        history = _order_book_history.get(base, [])
+        if history:
+            avg_bids = sum(h["bids_total"] for h in history) / len(history)
+            avg_asks = sum(h["asks_total"] for h in history) / len(history)
+            current = history[-1]
+            current_bids = current["bids_total"]
+            current_asks = current["asks_total"]
+            ratio_bids = current_bids / avg_bids if avg_bids > 0 else 0
+            ratio_asks = current_asks / avg_asks if avg_asks > 0 else 0
+            is_anomaly = ratio_bids > 3 or ratio_asks > 3
+            severity = "critical" if ratio_bids > 5 or ratio_asks > 5 else ("warning" if is_anomaly else "normal")
+            emoji = "🚨" if severity == "critical" else ("⚠️" if severity == "warning" else "✅")
+            ob_anomalies.append({
+                "symbol": base,
+                "avg_bids": round(avg_bids, 4),
+                "avg_asks": round(avg_asks, 4),
+                "current_bids": round(current_bids, 4),
+                "current_asks": round(current_asks, 4),
+                "ratio": round(max(ratio_bids, ratio_asks), 2),
+                "is_anomaly": is_anomaly,
+                "severity": severity,
+                "emoji": emoji,
+            })
+        else:
+            ob_anomalies.append({
+                "symbol": base,
+                "avg_bids": 0,
+                "avg_asks": 0,
+                "current_bids": 0,
+                "current_asks": 0,
+                "ratio": 0,
+                "is_anomaly": False,
+                "severity": "normal",
+                "emoji": "⏳",
+            })
+    ob_anomalies = sorted(ob_anomalies, key=lambda x: x["ratio"], reverse=True)
+    
+    # ── 3. 大額掛單（從 large_order_tracker 讀取）─────────────────────────
+    all_orders = large_order_tracker.get_large_orders(limit=50)
+    order_anomalies = sorted(all_orders, key=lambda x: x.get("quantity", 0), reverse=True)[:20]
+
+
+    # 對沒有歷史的幣種，並行抓一次即時數值
+    no_history = [o for o in ob_anomalies if o["emoji"] == "⏳"]
+    if no_history:
+        async def _fetch_one(base, sym_full):
+            try:
+                ob = await binance_client.get_order_book(sym_full.upper(), limit=100)
+                return (base, ob["bids_total"], ob["asks_total"])
+            except:
+                return (base, 0, 0)
+        results = await asyncio.gather(*[_fetch_one(o["symbol"], o["symbol"] + "USDT") for o in no_history])
+        for base, bids, asks in results:
+            for o in ob_anomalies:
+                if o["symbol"] == base:
+                    o["avg_bids"] = round(bids, 4)
+                    o["avg_asks"] = round(asks, 4)
+                    o["current_bids"] = round(bids, 4)
+                    o["current_asks"] = round(asks, 4)
+                    o["emoji"] = "⏳"
+                    break
+
+    return {
+        "volume_anomalies": vol_anomalies,
+        "ob_anomalies": ob_anomalies,
+        "order_anomalies": order_anomalies,
+        "vol_count": len(vol_anomalies),
+        "ob_count": len([o for o in ob_anomalies if o["is_anomaly"]]),
+        "order_count": len(order_anomalies),
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+@app.get("/api/anomalies/{symbol}")
+async def get_anomalies(symbol: str = "BTCUSDT"):
+    """偵測特定幣種的異常"""
+    return await detect_anomalies(symbol)
+
+
+# ─── 大額掛單追蹤 ─────────────────────────────────────────────────────────────
+
+class LargeOrderTracker:
+    """大額掛單追蹤器"""
+    
+    def __init__(self):
+        self._order_book_cache: dict[str, dict] = {}
+        self._large_orders: list[dict] = []
+        self._tracking_tasks: dict[str, asyncio.Task] = {}
+    
+    async def track_symbol(self, symbol: str):
+        """追蹤單一幣種的大額掛單"""
+        ws_url = f"wss://stream.binance.com:9443/ws/{symbol.lower()}@depth"
+        
+        while True:
+            try:
+                async with websockets.connect(ws_url) as ws:
+                    logger.info(f"Connected to depth stream: {symbol}")
+                    async for raw in ws:
+                        try:
+                            # In websockets 16.0, raw is already the string data
+                            data = raw if isinstance(raw, dict) else json.loads(raw)
+                            await self._process_depth_update(symbol, data)
+                        except Exception as e:
+                            logger.error(f"Error processing depth update for {symbol}: {e}")
+                            continue
+            except Exception as e:
+                logger.error(f"WebSocket error for {symbol}: {e}, reconnecting in 5s...")
+                await asyncio.sleep(5)
+    
+    async def _process_depth_update(self, symbol: str, data: dict):
+        """處理訂單簿更新"""
+        # 處理 Depth 訂單簿數據
+        bids = data.get("b", data.get("bids", []))  # 買單 [price, qty]
+        asks = data.get("a", data.get("asks", []))  # 賣單 [price, qty]
+        
+        # 追蹤大額掛單 (> 10 BTC)
+        large_orders = []
+        
+        for bid in bids[:5]:  # 前 5 筆買單
+            qty = float(bid[1])
+            if qty > 10:  # > 10 BTC
+                severity = "critical" if qty > 50 else "warning"
+                emoji = "🚨" if qty > 50 else "⚠️"
+                large_orders.append({
+                    "symbol": symbol.replace("USDT", ""),
+                    "side": "BID",
+                    "price": float(bid[0]),
+                    "quantity": round(qty, 4),
+                    "severity": severity,
+                    "emoji": emoji,
+                    "timestamp": datetime.now().isoformat()
+                })
+        
+        for ask in asks[:5]:  # 前 5 筆賣單
+            qty = float(ask[1])
+            if qty > 10:  # > 10 BTC
+                severity = "critical" if qty > 50 else "warning"
+                emoji = "🚨" if qty > 50 else "⚠️"
+                large_orders.append({
+                    "symbol": symbol.replace("USDT", ""),
+                    "side": "ASK",
+                    "price": float(ask[0]),
+                    "quantity": round(qty, 4),
+                    "severity": severity,
+                    "emoji": emoji,
+                    "timestamp": datetime.now().isoformat()
+                })
+        
+        if large_orders:
+            self._large_orders.extend(large_orders)
+            # 保持最近 100 筆記錄
+            self._large_orders = self._large_orders[-100:]
+    
+    def get_large_orders(self, limit: int = 50) -> list:
+        """取得大額掛單記錄"""
+        return self._large_orders[-limit:]
+    
+    async def start_tracking(self, symbols: list[str]):
+        """啟動追蹤任務"""
+        for sym in symbols:
+            if sym not in self._tracking_tasks:
+                task = asyncio.create_task(self.track_symbol(sym))
+                self._tracking_tasks[sym] = task
+    
+    def stop_tracking(self, symbol: str = None):
+        """停止追蹤任務"""
+        if symbol:
+            if symbol in self._tracking_tasks:
+                self._tracking_tasks[symbol].cancel()
+                del self._tracking_tasks[symbol]
+        else:
+            for task in self._tracking_tasks.values():
+                task.cancel()
+            self._tracking_tasks.clear()
+
+
+# 全域大額掛單追蹤器
+large_order_tracker = LargeOrderTracker()
+
+
+@app.get("/api/large-orders")
+async def get_large_orders(symbol: str = None, limit: int = 50):
+    """取得大額掛單"""
+    orders = large_order_tracker.get_large_orders(limit=limit)
+    
+    if symbol:
+        symbol_upper = symbol.upper()
+        orders = [o for o in orders if symbol_upper in o.get("symbol", "")]
+    
+    # 按 severity 分組
+    critical = [o for o in orders if o.get("severity") == "critical"]
+    warnings = [o for o in orders if o.get("severity") == "warning"]
+
+
+    return {"alerts": [], "count": 0, "timestamp": datetime.now().isoformat(), "error": str(e)}
+
+
+@app.get("/api/events")
+async def sse_events():
+    """SSE 即時事件流"""
+    async def event_generator():
+        while True:
+            try:
+                data = {
+                    "type": "price_update",
+                    "symbol": "BTCUSDT",
+                    "price": 70500.00,
+                    "timestamp": datetime.now().isoformat()
+                }
+                yield f"data: {json.dumps(data)}\n\n"
+            except Exception:
+                break
+            await asyncio.sleep(5)
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.get("/", response_class=HTMLResponse)
+async def home():
+    """首頁 - Dashboard UI (經典版)"""
+    html_path = os.path.join(os.path.dirname(__file__), "templates", "index.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+@app.get("/dashboard_v2", response_class=HTMLResponse)
+async def dashboard_v2():
+    """Dashboard UI v2 - 全新設計儀表板"""
+    html_path = os.path.join(os.path.dirname(__file__), "templates", "dashboard_v2.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+@app.post("/api/analyze")
+async def trigger_analysis(symbol: str = "BTCUSDT"):
+    """手動觸發分析"""
+    try:
+        signals = await run_analysis(symbol=symbol)
+        return {"status": "ok", "signals": signals}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+async def run_analysis(symbol: str = "BTCUSDT"):
+    """執行分析流程"""
+    logger.info(f"Running analysis for {symbol}...")
+    
+    strategies = get_all_strategies(symbol)
+    strategies_results = []
+    
+    # 執行各策略分析
+    for strategy in strategies:
+        try:
+            result = await strategy.analyze()
+            if result:
+                strategies_results.append(result)
+                
+                # 更新策略狀態
+                _app_state["strategy_statuses"][strategy.name] = {
+                    "last_run": datetime.now().isoformat(),
+                    "last_signal": result["signal"]
+                }
+                
+                logger.info(f"{strategy.name}: {result['signal']}")
+        except Exception as e:
+            logger.error(f"Strategy {strategy.name} failed: {e}")
+    
+    # AI 分析
+    ai_analyst = AIAnalyst()
+    ai_result = await ai_analyst.analyze(symbol, strategies_results)
+    
+    _app_state["last_analysis"] = ai_result
+    
+    # 發送通知（如果有訊號）
+    for strategy_result in strategies_results:
+        await notification_manager.send_signal(symbol, strategy_result, ai_result)
+        
+        # 保存訊號到資料庫
+        try:
+            signal_id = signals_db.save_signal(
+                symbol=symbol,
+                signal=strategy_result["signal"],
+                direction=strategy_result["direction"],
+                price=strategy_result["price"],
+                strategy=strategy_result["strategy"],
+                ai_confidence=ai_result["confidence_score"],
+                ai_rating=ai_result["rating"]
+            )
+            logger.info(f"Signal saved to DB: id={signal_id}")
+        except Exception as e:
+            logger.error(f"Failed to save signal to DB: {e}")
+        
+        # 更新最近訊號
+        _app_state["last_signals"].append({
+            "symbol": symbol,
+            "signal": strategy_result["signal"],
+            "direction": strategy_result["direction"],
+            "price": strategy_result["price"],
+            "strategy": strategy_result["strategy"],
+            "ai_confidence": ai_result["confidence_score"],
+            "ai_rating": ai_result["rating"],
+            "timestamp": datetime.now().isoformat()
+        })
+    
+    return strategies_results
+
+
+# ─── Autoresearch API ────────────────────────────────────────────────────────
+
+class AutoresearchStatusResponse(BaseModel):
+    is_running: bool
+    experiments_completed: int
+    successful_experiments: int
+    discarded_experiments: int
+    crashed_experiments: int
+    best_strategies: int
+    started_at: Optional[str]
+    last_experiment_at: Optional[str]
+
+
+class BestParamsResponse(BaseModel):
+    strategy_name: str
+    params: dict
+    sharpe_ratio: float
+    win_rate: float
+    max_drawdown_pct: float
+    total_return_pct: float
+    experiment_id: str
+    updated_at: str
+
+
+class ExperimentHistoryItem(BaseModel):
+    experiment_id: str
+    strategy_name: str
+    status: str
+    sharpe: float
+    win_rate: float
+    max_drawdown: float
+    params: dict
+    timestamp: str
+
+
+# ─── Trade API (for backtest injection) ─────────────────────────────────────
+
+class OpenTradeRequest(BaseModel):
+    strategy_name: str
+    entry_price: float
+    quantity: float
+    direction: str  # "long" or "short"
+
+
+class CloseTradeRequest(BaseModel):
+    strategy_name: str
+    trade_id: str
+    exit_price: float
+    commission: float = 0.0
+
+
+@app.post("/api/trades/open")
+async def open_trade(req: OpenTradeRequest):
+    """Open a trade for a strategy (used by backtest fill script)"""
+    try:
+        ranker = get_ranking_service()
+        # Ensure strategy is registered
+        tracker = ranker.get_tracker(req.strategy_name)
+        if not tracker:
+            ranker.register_strategy(req.strategy_name)
+            tracker = ranker.get_tracker(req.strategy_name)
+        direction = TradeDirection.LONG if req.direction.lower() == "long" else TradeDirection.SHORT
+        trade_id = tracker.open_trade(
+            entry_price=req.entry_price,
+            quantity=req.quantity,
+            direction=direction,
+        )
+
+
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+@app.post("/api/trades/close")
+async def close_trade(req: CloseTradeRequest):
+    """Close an open trade"""
+    try:
+        ranker = get_ranking_service()
+        tracker = ranker.get_tracker(req.strategy_name)
+        if not tracker:
+            raise HTTPException(status_code=404, detail=f"Strategy '{req.strategy_name}' not found")
+        pnl = tracker.close_trade(
+            trade_id=req.trade_id,
+            exit_price=req.exit_price,
+            commission=req.commission,
+        )
+        if pnl is None:
+            raise HTTPException(status_code=404, detail=f"Trade '{req.trade_id}' not found")
+        return {"trade_id": req.trade_id, "pnl": pnl}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/autoresearch/status", response_model=AutoresearchStatusResponse)
+async def autoresearch_status():
+    """Get Autoresearch overall status"""
+    p = get_ar_persistence()
+    state = p.get_state()
+    return AutoresearchStatusResponse(
+        is_running=False,  # managed by separate process
+        experiments_completed=state.total_experiments,
+        successful_experiments=state.successful_experiments,
+        discarded_experiments=state.discarded_experiments,
+        crashed_experiments=state.crashed_experiments,
+        best_strategies=len(state.best_by_strategy),
+        started_at=state.started_at,
+        last_experiment_at=state.last_experiment_at,
+    )
+
+
+@app.get("/api/autoresearch/best", response_model=list[BestParamsResponse])
+async def autoresearch_best(strategy: Optional[str] = None):
+    """Get best params per strategy"""
+    p = get_ar_persistence()
+    best_by_strategy = p.get_best_by_strategy()
+    result = []
+    for strat, best in best_by_strategy.items():
+        if strategy and strat != strategy:
+            continue
+        result.append(BestParamsResponse(
+            strategy_name=strat,
+            params=best.params,
+            sharpe_ratio=best.metrics.get("sharpe_ratio", 0),
+            win_rate=best.metrics.get("win_rate", 0),
+            max_drawdown_pct=best.metrics.get("max_drawdown_pct", 0),
+            total_return_pct=best.metrics.get("total_return_pct", 0),
+            experiment_id=best.experiment_id,
+            updated_at=best.updated_at,
+        ))
+    return result
+
+
+@app.get("/api/autoresearch/history", response_model=list[ExperimentHistoryItem])
+async def autoresearch_history(
+    strategy: Optional[str] = None,
+    limit: int = 20
+):
+    """Get experiment history"""
+    p = get_ar_persistence()
+    experiments = p.get_recent_experiments(n=limit, strategy_name=strategy)
+    return [
+        ExperimentHistoryItem(
+            experiment_id=exp.experiment_id,
+            strategy_name=exp.strategy_name,
+            status=exp.status,
+            sharpe=exp.sharpe,
+            win_rate=exp.win_rate,
+            max_drawdown=exp.max_drawdown,
+            params=exp.params,
+            timestamp=exp.timestamp,
+        )
+        for exp in experiments
+    ]
+
+
+@app.get("/api/autoresearch/report")
+async def autoresearch_report():
+    """Get full Autoresearch report"""
+    p = get_ar_persistence()
+    state = p.get_state()
+    experiments = state.get_all_experiments()
+    return {
+        "experiments": experiments,
+        "summary": {
+            "total": state.total_experiments,
+            "successful": state.successful_experiments,
+            "discarded": state.discarded_experiments,
+            "crashed": state.crashed_experiments,
+        },
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+
+# @app.get("/api/multifactor/all") - temporarily disabled
+# Temporarily disabled - broken by edits
+# async def get_all_multifactor_signals():
+#     """取得所有 20 幣種的多因子信號"""
+#     return {"signals": [], "count": 0, "timestamp": datetime.now().isoformat()}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

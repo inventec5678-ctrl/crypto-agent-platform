@@ -1,0 +1,179 @@
+{
+  "name": "分層門檻系統",
+  "version": "1.0",
+  "description": "動態分層門檻驗證系統，讓高質量策略在某些指標特別突出時能獲得放寬資格",
+  "layers": {
+    "layer1_standard": {
+      "description": "標準組合（全部滿足）",
+      "criteria": {
+        "WR": { "min": 50, "unit": "%" },
+        "PF": { "min": 2.0 },
+        "DD": { "max": 30, "unit": "%" },
+        "Sharpe": { "min": 1.5 }
+      },
+      "logic": "WR >= 50 AND PF >= 2.0 AND DD <= 30 AND Sharpe >= 1.5"
+    },
+    "layer2_relaxed": {
+      "description": "放寬組合（任一條件滿足即可）",
+      "conditions": [
+        {
+          "id": "RELAXED_WR_70",
+          "突出指標": "WR >= 70%",
+          "requirements": {
+            "WR": { "min": 70, "unit": "%" },
+            "Sharpe": { "min": 1.0 },
+            "PF": { "min": 1.5 },
+            "DD": { "max": 40, "unit": "%" }
+          }
+        },
+        {
+          "id": "RELAXED_WR_60",
+          "突出指標": "WR >= 60%",
+          "requirements": {
+            "WR": { "min": 60, "unit": "%" },
+            "Sharpe": { "min": 1.2 },
+            "PF": { "min": 1.8 },
+            "DD": { "max": 35, "unit": "%" }
+          }
+        },
+        {
+          "id": "RELAXED_SHARPE_3",
+          "突出指標": "Sharpe >= 3.0",
+          "requirements": {
+            "Sharpe": { "min": 3.0 },
+            "WR": { "min": 40, "unit": "%" },
+            "PF": { "min": 1.5 },
+            "DD": { "max": 40, "unit": "%" }
+          }
+        },
+        {
+          "id": "RELAXED_SHARPE_2.5",
+          "突出指標": "Sharpe >= 2.5",
+          "requirements": {
+            "Sharpe": { "min": 2.5 },
+            "WR": { "min": 45, "unit": "%" },
+            "PF": { "min": 1.6 },
+            "DD": { "max": 35, "unit": "%" }
+          }
+        },
+        {
+          "id": "RELAXED_DD_10",
+          "突出指標": "DD <= 10%",
+          "requirements": {
+            "DD": { "max": 10, "unit": "%" },
+            "WR": { "min": 40, "unit": "%" },
+            "PF": { "min": 1.5 },
+            "Sharpe": { "min": 1.0 }
+          }
+        },
+        {
+          "id": "RELAXED_DD_15",
+          "突出指標": "DD <= 15%",
+          "requirements": {
+            "DD": { "max": 15, "unit": "%" },
+            "WR": { "min": 45, "unit": "%" },
+            "PF": { "min": 1.6 },
+            "Sharpe": { "min": 1.2 }
+          }
+        },
+        {
+          "id": "RELAXED_PF_3",
+          "突出指標": "PF >= 3.0",
+          "requirements": {
+            "PF": { "min": 3.0 },
+            "WR": { "min": 40, "unit": "%" },
+            "DD": { "max": 40, "unit": "%" },
+            "Sharpe": { "min": 1.0 }
+          }
+        },
+        {
+          "id": "RELAXED_PF_2.5",
+          "突出指標": "PF >= 2.5",
+          "requirements": {
+            "PF": { "min": 2.5 },
+            "WR": { "min": 45, "unit": "%" },
+            "DD": { "max": 35, "unit": "%" },
+            "Sharpe": { "min": 1.2 }
+          }
+        }
+      ]
+    },
+    "layer3_absolute": {
+      "description": "絕對底線（任何策略都不能突破）",
+      "minimums": {
+        "WR": { "min": 35, "unit": "%" },
+        "PF": { "min": 1.0 },
+        "DD": { "max": 50, "unit": "%" },
+        "Sharpe": { "min": 0.5 }
+      },
+      "logic": "WR >= 35 AND PF >= 1.0 AND DD <= 50 AND Sharpe >= 0.5"
+    }
+  },
+  "evaluation_logic": {
+    "step1": "檢查 Layer 1（標準組合）→ 全部滿足 = PASS，回傳標記 'STANDARD'",
+    "step2": "Layer 1 不滿足時，檢查 Layer 3（絕對底線）→ 任何一個突破底線 = FAIL",
+    "step3": "Layer 3 通過後，檢查 Layer 2（放寬組合）→ 任一放寬條件滿足 = PASS（有標記如 'RELAXED_WR_70'）",
+    "step4": "策略標記規則：'STANDARD' = 通過 Layer 1；'RELAXED_XX_VV' = 通過特定放寬條件",
+    "priority": "Layer 1 > Layer 3 > Layer 2"
+  },
+  "validation_example": {
+    "strategy_name": "SHORT-ONLY Death Cross",
+    "metrics": {
+      "WR": 88.9,
+      "PF": 9.14,
+      "DD": 3.5,
+      "Sharpe": 1.34
+    },
+    "layer1_check": {
+      "WR >= 50": true,
+      "PF >= 2.0": true,
+      "DD <= 30": true,
+      "Sharpe >= 1.5": false
+    },
+    "layer3_check": {
+      "WR >= 35": true,
+      "PF >= 1.0": true,
+      "DD <= 50": true,
+      "Sharpe >= 0.5": true
+    },
+    "layer2_matches": [
+      {
+        "condition": "RELAXED_DD_10",
+        "突出指標": "DD <= 10%",
+        "requirements_met": {
+          "DD <= 10": true,
+          "WR >= 40": true,
+          "PF >= 1.5": true,
+          "Sharpe >= 1.0": true
+        },
+        "PASS": true
+      },
+      {
+        "condition": "RELAXED_PF_2.5",
+        "突出指標": "PF >= 2.5",
+        "requirements_met": {
+          "PF >= 2.5": true,
+          "WR >= 45": true,
+          "DD <= 35": true,
+          "Sharpe >= 1.2": true
+        },
+        "PASS": true
+      },
+      {
+        "condition": "RELAXED_PF_3",
+        "突出指標": "PF >= 3.0",
+        "requirements_met": {
+          "PF >= 3.0": true,
+          "WR >= 40": true,
+          "DD <= 40": true,
+          "Sharpe >= 1.0": true
+        },
+        "PASS": true
+      }
+    ],
+    "result": "PASS",
+    "pass_through": "Layer 1 失敗（Sharpe 1.34 < 1.5），但通過 Layer 3 底線，且符合 Layer 2 多個放寬條件",
+    "tags": ["RELAXED_PF_3", "RELAXED_PF_2.5", "RELAXED_DD_10"],
+    "primary_tag": "RELAXED_PF_3"
+  }
+}
