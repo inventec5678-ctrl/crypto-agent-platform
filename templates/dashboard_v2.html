@@ -96,7 +96,7 @@
         .sidebar-footer { padding: var(--space-md); border-top: 1px solid var(--border-color); font-size: 11px; color: var(--text-muted); }
 
         /* ── Main ── */
-        .main-content { flex: 1; margin-left: 220px; min-height: 100vh; }
+        .main-content { flex: 1; min-height: 100vh; }
         .topbar {
             position: sticky; top: 0; z-index: 50;
             background: rgba(13,17,23,0.9);
@@ -519,29 +519,10 @@
 
 <div class="app-layout">
     <!-- Sidebar -->
-    <nav class="sidebar" id="sidebar">
-        <div class="sidebar-logo">
-            <span class="sidebar-logo-icon">🚀</span>
-            <span class="sidebar-logo-text">CryptoQuant</span>
-        </div>
-        <div class="sidebar-nav">
-            <div class="nav-item active" onclick="navigate('dashboard')">
-                <span class="nav-item-icon">📊</span>
-                <span>策略儀表板</span>
-            </div>
-            <div class="nav-item" onclick="navigate('ranking')">
-                <span class="nav-item-icon">🏆</span>
-                <span>策略排行</span>
-            </div>
-        </div>
-        <div class="sidebar-footer">
-            <div>加密貨幣量化平台 v2</div>
-            <div style="margin-top:4px;">Powered by AI Agents</div>
-        </div>
-    </nav>
+    
 
     <!-- Main -->
-    <main class="main-content">
+    
         <div class="topbar">
             <div class="topbar-title">📈 加密貨幣量化交易平台</div>
             <div class="topbar-right">
@@ -665,7 +646,7 @@
             </div>
 
         </div>
-    </main>
+    
 </div>
 
 <!-- Strategy Detail Modal -->
