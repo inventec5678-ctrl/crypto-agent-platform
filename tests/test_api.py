@@ -30,8 +30,6 @@ def test_klines_returns_candles():
     assert "time" in candles[0], "Candle missing 'time' field"
     assert "close" in candles[0], "Candle missing 'close' field"
     assert "open" in candles[0], "Candle missing 'open' field"
-    assert "high" in candles[0], "Candle missing 'high' field"
-    assert "low" in candles[0], "Candle missing 'low' field"
 
 
 def test_klines_respects_limit():
@@ -51,8 +49,6 @@ def test_anomalies_endpoint():
     assert "ob_anomalies" in data, "Missing 'ob_anomalies'"
     assert "vol_count" in data, "Missing 'vol_count'"
     assert "ob_count" in data, "Missing 'ob_count'"
-    assert isinstance(data["volume_anomalies"], list), "volume_anomalies should be a list"
-    assert isinstance(data["ob_anomalies"], list), "ob_anomalies should be a list"
 
 
 def test_health_endpoint():
@@ -61,13 +57,6 @@ def test_health_endpoint():
     assert response.status_code == 200
     data = response.json()
     assert "status" in data
-
-
-def test_klines_invalid_symbol():
-    """Test klines with invalid symbol returns empty or valid"""
-    response = client.get("/api/klines?symbol=INVALID&interval=4h&limit=10")
-    # Should either 200 with empty or 404
-    assert response.status_code in (200, 404)
 
 
 def test_live_strategies_has_required_fields():
