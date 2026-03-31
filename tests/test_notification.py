@@ -1,348 +1,301 @@
 """
-通知測試
-測試 Discord 通知和其他通知渠道
+通知服務單元測試
 """
 import pytest
 import sys
 import os
 from unittest.mock import MagicMock, patch, AsyncMock
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-class TestDiscordNotifier:
-    """測試 Discord 通知功能"""
+class TestNotificationManager:
+    """測試通知管理器"""
 
     def setup_method(self):
         """設置測試環境"""
-        self.webhook_url = "https://discord.com/api/webhooks/test"
-        self.test_message = {
-            "content": "Test message",
-            "embeds": [{
-                "title": "Test Signal",
-                "color": 3066993,  # 綠色
-                "fields": [
-                    {"name": "Symbol", "value": "BTCUSDT", "inline": True},
-                    {"name": "Signal", "value": "BUY", "inline": True},
-                ]
-            }]
+        self.webhook_url = "https://discord.com/api/webhooks/test/webhook"
+
+    def _make_signal_data(self):
+        return {
+            "symbol": "BTCUSDT",
+            "signal": "BUY",
+            "direction": "LONG",
+            "price": 50000.0,
+            "confidence": 75.0,
         }
 
-    @patch('requests.post')
-    def test_send_embed_message(self, mock_post):
-        """測試發送嵌入消息"""
+    def _make_ai_analysis(self):
+        return {
+            "confidence_score": 72.5,
+            "rating": "★★",
+            "factors": {
+                "technical": 75.0,
+                "sentiment": 70.0,
+                "social": 65.0,
+                "anomaly": 80.0,
+            },
+        }
+
+    @patch('httpx.AsyncClient')
+    async def test_send_signal_success(self, mock_client_class):
+        """測試發送信號通知成功"""
         mock_response = MagicMock()
         mock_response.status_code = 204
-        mock_post.return_value = mock_response
 
-        response = mock_post(
-            self.webhook_url,
-            json=self.test_message
+        mock_client_instance = AsyncMock()
+        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+        mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+        mock_client_instance.post = AsyncMock(return_value=mock_response)
+        mock_client_class.return_value = mock_client_instance
+
+        from notification import NotificationManager
+        manager = NotificationManager()
+        manager.webhook_url = self.webhook_url
+
+        result = await manager.send_signal(
+            self._make_signal_data()["symbol"],
+            self._make_signal_data(),
+            self._make_ai_analysis(),
         )
 
-        assert response.status_code == 204
-        mock_post.assert_called_once()
+        assert result is True
 
-    @patch('requests.post')
-    def test_send_signal_notification(self, mock_post):
-        """測試發送信號通知"""
-        mock_response = MagicMock()
-        mock_response.status_code = 204
-        mock_post.return_value = mock_response
-
-        signal_message = {
-            "content": "📊 **交易信號**",
-            "embeds": [{
-                "title": "BTCUSDT BUY Signal",
-                "description": "信心分: 85%",
-                "color": 3066993,
-                "fields": [
-                    {"name": "信號", "value": "BUY", "inline": True},
-                    {"name": "信心", "value": "85%", "inline": True},
-                    {"name": "價格", "value": "$50,000", "inline": True},
-                ],
-                "footer": {"text": "Crypto Agent Platform"}
-            }]
-        }
-
-        response = mock_post(self.webhook_url, json=signal_message)
-        assert response.status_code == 204
-
-    @patch('requests.post')
-    def test_send_error_notification(self, mock_post):
-        """測試發送錯誤通知"""
-        mock_response = MagicMock()
-        mock_response.status_code = 204
-        mock_post.return_value = mock_response
-
-        error_message = {
-            "content": "⚠️ **系統錯誤**",
-            "embeds": [{
-                "title": "API Error",
-                "description": "幣安 API 回應錯誤",
-                "color": 15158332  # 紅色
-            }]
-        }
-
-        response = mock_post(self.webhook_url, json=error_message)
-        assert response.status_code == 204
-
-    @patch('requests.post')
-    def test_webhook_unavailable(self, mock_post):
+    @patch('httpx.AsyncClient')
+    async def test_send_signal_webhook_unavailable(self, mock_client_class):
         """測試 Webhook 不可用"""
         mock_response = MagicMock()
         mock_response.status_code = 404
-        mock_post.return_value = mock_response
+        mock_response.text = "Not found"
 
-        response = mock_post(self.webhook_url, json=self.test_message)
+        mock_client_instance = AsyncMock()
+        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+        mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+        mock_client_instance.post = AsyncMock(return_value=mock_response)
+        mock_client_class.return_value = mock_client_instance
 
-        assert response.status_code == 404
+        from notification import NotificationManager
+        manager = NotificationManager()
+        manager.webhook_url = self.webhook_url
 
-    @patch('requests.post')
-    def test_rate_limit_handling(self, mock_post):
-        """測試 Rate Limit 處理"""
+        result = await manager.send_signal(
+            "BTCUSDT",
+            self._make_signal_data(),
+            self._make_ai_analysis(),
+        )
+
+        assert result is False
+
+    @patch('httpx.AsyncClient')
+    async def test_send_signal_rate_limited(self, mock_client_class):
+        """測試 Rate Limit 攔截"""
         mock_response = MagicMock()
         mock_response.status_code = 429
-        mock_response.headers = {"Retry-After": "5"}
-        mock_post.return_value = mock_response
 
-        response = mock_post(self.webhook_url, json=self.test_message)
+        mock_client_instance = AsyncMock()
+        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+        mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+        mock_client_instance.post = AsyncMock(return_value=mock_response)
+        mock_client_class.return_value = mock_client_instance
 
-        assert response.status_code == 429
+        from notification import NotificationManager
+        manager = NotificationManager()
+        manager.webhook_url = self.webhook_url
 
+        # 前 3 次應該可以發送（MAX_DAILY_NOTIFICATIONS = 3）
+        for _ in range(3):
+            result = await manager.send_signal(
+                "BTCUSDT",
+                self._make_signal_data(),
+                self._make_ai_analysis(),
+            )
+            assert result is True
 
-class TestNotificationFormatting:
-    """測試通知格式化"""
+        # 第 4 次應該被 Rate Limit 攔截
+        result = await manager.send_signal(
+            "BTCUSDT",
+            self._make_signal_data(),
+            self._make_ai_analysis(),
+        )
+        assert result is False
 
-    def test_signal_embed_color_buy(self):
-        """測試買入信號顏色（綠色）"""
-        color_buy = 3066993  # 綠色
-        assert color_buy == 0x2ECC71 or color_buy == 3066993
+    @patch('httpx.AsyncClient')
+    async def test_send_signal_no_webhook(self, mock_client_class):
+        """測試無 Webhook 時不發送"""
+        from notification import NotificationManager
+        manager = NotificationManager()
+        manager.webhook_url = ""
 
-    def test_signal_embed_color_sell(self):
-        """測試賣出信號顏色（紅色）"""
-        color_sell = 15158332  # 紅色
-        assert color_sell == 0xE74C3C or color_sell == 15158332
+        result = await manager.send_signal(
+            "BTCUSDT",
+            self._make_signal_data(),
+            self._make_ai_analysis(),
+        )
 
-    def test_signal_embed_color_hold(self):
-        """測試持有信號顏色（黃色）"""
-        color_hold = 16776960  # 黃色
-        assert color_hold == 0xFFFF00 or color_hold == 16776960
+        assert result is False
+        mock_client_class.assert_not_called()
 
-    def test_emoji_for_signal(self):
-        """測試信號表情符號"""
-        assert "📈" == "📈"  # 買入
-        assert "📉" == "📉"  # 賣出
-        assert "⏸️" == "⏸️"  # 持有
+    @patch('httpx.AsyncClient')
+    async def test_send_status(self, mock_client_class):
+        """測試發送狀態更新"""
+        mock_response = MagicMock()
+        mock_response.status_code = 204
 
-    def test_format_price(self):
-        """測試價格格式化"""
-        price = 50500.123456
-        formatted = f"${price:,.2f}"
-        assert formatted == "$50,500.12"
+        mock_client_instance = AsyncMock()
+        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+        mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+        mock_client_instance.post = AsyncMock(return_value=mock_response)
+        mock_client_class.return_value = mock_client_instance
 
-    def test_format_percentage(self):
-        """測試百分比格式化"""
-        percentage = 85.5
-        formatted = f"{percentage:.1f}%"
-        assert formatted == "85.5%"
+        from notification import NotificationManager
+        manager = NotificationManager()
+        manager.webhook_url = self.webhook_url
 
-    def test_format_timestamp(self):
-        """測試時間戳格式化"""
-        import datetime
-        timestamp = 1709000000
-        dt = datetime.datetime.fromtimestamp(timestamp)
-        formatted = dt.strftime("%Y-%m-%d %H:%M:%S")
+        result = await manager.send_status("System is running", color=0x3498DB)
 
-        assert "2024" in formatted
-        assert ":" in formatted
+        assert result is True
 
+    @patch('httpx.AsyncClient')
+    async def test_send_webhook_error_handling(self, mock_client_class):
+        """測試 Webhook 錯誤處理"""
+        mock_client_instance = AsyncMock()
+        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+        mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+        mock_client_instance.post = AsyncMock(side_effect=Exception("Network error"))
+        mock_client_class.return_value = mock_client_instance
 
-class TestNotificationQueue:
-    """測試通知隊列"""
+        from notification import NotificationManager
+        manager = NotificationManager()
+        manager.webhook_url = self.webhook_url
 
-    def setup_method(self):
-        """設置通知隊列"""
-        self.queue = []
-        self.max_queue_size = 10
+        result = await manager.send_status("Test message")
 
-    def enqueue(self, message):
-        """添加消息到隊列"""
-        if len(self.queue) >= self.max_queue_size:
-            # 移除最舊的消息
-            self.queue.pop(0)
-        self.queue.append(message)
-
-    def dequeue(self):
-        """從隊列取出消息"""
-        if self.queue:
-            return self.queue.pop(0)
-        return None
-
-    def test_enqueue_message(self):
-        """測試添加消息"""
-        self.enqueue({"type": "signal", "data": "test"})
-        assert len(self.queue) == 1
-
-    def test_dequeue_message(self):
-        """測試取出消息"""
-        self.enqueue({"type": "signal", "data": "test"})
-        message = self.dequeue()
-
-        assert message is not None
-        assert message["type"] == "signal"
-        assert len(self.queue) == 0
-
-    def test_queue_overflow(self):
-        """測試隊列溢出"""
-        for i in range(15):
-            self.enqueue({"id": i})
-
-        # 應該只保留最新的 10 條
-        assert len(self.queue) == 10
-        assert self.queue[0]["id"] == 5  # 第 6 條是最舊的
-
-    def test_empty_queue(self):
-        """測試空隊列"""
-        message = self.dequeue()
-        assert message is None
+        assert result is False
 
 
-class TestNotificationThrottling:
-    """測試通知節流"""
+class TestNotificationRateLimit:
+    """測試 Rate Limit 邏輯"""
 
-    def setup_method(self):
-        """設置節流器"""
-        self.last_notification_time = 0
-        self.min_interval = 60  # 最少 60 秒間隔
+    def test_daily_limit_per_symbol(self):
+        """測試每天每檔幣種的限制"""
+        from notification import NotificationManager
+        import asyncio
 
-    def can_send_notification(self, current_time):
-        """檢查是否可以發送通知"""
-        return current_time - self.last_notification_time >= self.min_interval
+        manager = NotificationManager()
+        manager.webhook_url = "https://test.webhook"
 
-    def record_notification(self, current_time):
-        """記錄發送時間"""
-        self.last_notification_time = current_time
+        # BTC 應該有獨立計數
+        for i in range(3):
+            can_send = asyncio.get_event_loop().run_until_complete(
+                manager._check_rate_limit("BTCUSDT")
+            )
+            assert can_send is True
 
-    def test_throttle_same_signal(self):
-        """測試同一信號節流"""
-        import time
-        now = time.time()
+        # 第 4 次應該被限制
+        can_send = asyncio.get_event_loop().run_until_complete(
+            manager._check_rate_limit("BTCUSDT")
+        )
+        assert can_send is False
 
-        assert self.can_send_notification(now)  # 第一次可以
+        # ETH 應該有獨立的計數（不受 BTC 影響）
+        can_send = asyncio.get_event_loop().run_until_complete(
+            manager._check_rate_limit("ETHUSDT")
+        )
+        assert can_send is True
 
-        self.record_notification(now)
-        assert not self.can_send_notification(now)  # 馬上不行
+    def test_daily_limit_resets_new_day(self):
+        """測試新的一天重置計數"""
+        from notification import NotificationManager
+        import asyncio
 
-    def test_throttle_after_interval(self):
-        """測試間隔後可以發送"""
-        import time
-        now = time.time()
+        manager = NotificationManager()
+        manager.webhook_url = "https://test.webhook"
 
-        self.record_notification(now - 100)  # 100 秒前
-        assert self.can_send_notification(now)
-
-    def test_different_signals_same_time(self):
-        """測試同一時間不同信號"""
-        import time
-        now = time.time()
-
-        # 重要信號可以不受節流限制
-        important_signal = True
-        if important_signal:
-            assert self.can_send_notification(now)
-
-
-class TestNotificationTemplates:
-    """測試通知模板"""
-
-    def format_signal_message(self, symbol, signal, confidence, price):
-        """格式化信號消息"""
-        emoji = "📈" if signal == "BUY" else "📉" if signal == "SELL" else "⏸️"
-        color = 3066993 if signal == "BUY" else (15158332 if signal == "SELL" else 16776960)
-
-        return {
-            "content": f"{emoji} **{signal} Signal**",
-            "embeds": [{
-                "title": f"{symbol} {signal}",
-                "color": color,
-                "fields": [
-                    {"name": "Symbol", "value": symbol, "inline": True},
-                    {"name": "Signal", "value": signal, "inline": True},
-                    {"name": "Confidence", "value": f"{confidence}%", "inline": True},
-                    {"name": "Price", "value": f"${price:,.2f}", "inline": True},
-                ]
-            }]
+        # 模擬今天已發送 3 次
+        manager._daily_counts["BTCUSDT"] = {
+            "count": 3,
+            "date": datetime.now().strftime("%Y-%m-%d"),
         }
 
-    def test_buy_signal_format(self):
-        """測試買入信號格式"""
-        message = self.format_signal_message("BTCUSDT", "BUY", 85, 50000)
+        # 今天不能再發送
+        can_send = asyncio.get_event_loop().run_until_complete(
+            manager._check_rate_limit("BTCUSDT")
+        )
+        assert can_send is False
 
-        assert "📈" in message["content"]
-        assert "BUY" in message["content"]
-        assert message["embeds"][0]["fields"][1]["value"] == "BUY"
+        # 模擬昨天
+        manager._daily_counts["BTCUSDT"]["date"] = "2020-01-01"
 
-    def test_sell_signal_format(self):
-        """測試賣出信號格式"""
-        message = self.format_signal_message("ETHUSDT", "SELL", 75, 3000)
-
-        assert "📉" in message["content"]
-        assert "SELL" in message["content"]
-        assert message["embeds"][0]["color"] == 15158332
-
-    def test_hold_signal_format(self):
-        """測試持有信號格式"""
-        message = self.format_signal_message("BNBUSDT", "HOLD", 50, 500)
-
-        assert "⏸️" in message["content"]
-        assert "HOLD" in message["content"]
-        assert message["embeds"][0]["color"] == 16776960
+        # 新的一天可以發送
+        can_send = asyncio.get_event_loop().run_until_complete(
+            manager._check_rate_limit("BTCUSDT")
+        )
+        assert can_send is True
 
 
-class TestNotificationBatch:
-    """測試通知批量發送"""
+class TestNotificationEmbedFormatting:
+    """測試 Embed 格式化"""
 
-    def setup_method(self):
-        """設置批量通知"""
-        self.batch = []
-        self.batch_size = 5
+    @patch('httpx.AsyncClient')
+    async def test_buy_signal_embed_color(self, mock_client_class):
+        """測試買入信號使用綠色"""
+        mock_response = MagicMock()
+        mock_response.status_code = 204
 
-    def add_to_batch(self, notification):
-        """添加到批量"""
-        self.batch.append(notification)
+        captured_request = {}
 
-    def should_send_batch(self):
-        """檢查是否應該發送批量"""
-        return len(self.batch) >= self.batch_size
+        async def capture_post(*args, **kwargs):
+            captured_request["json"] = kwargs.get("json", {})
+            return mock_response
 
-    def clear_batch(self):
-        """清空批量"""
-        sent = self.batch.copy()
-        self.batch = []
-        return sent
+        mock_client_instance = AsyncMock()
+        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+        mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+        mock_client_instance.post = capture_post
+        mock_client_class.return_value = mock_client_instance
 
-    def test_batch_accumulation(self):
-        """測試批量累積"""
-        for i in range(3):
-            self.add_to_batch({"id": i})
+        from notification import NotificationManager
+        manager = NotificationManager()
+        manager.webhook_url = self.webhook_url
 
-        assert len(self.batch) == 3
-        assert not self.should_send_batch()
+        await manager.send_signal(
+            "BTCUSDT",
+            {"symbol": "BTCUSDT", "signal": "BUY", "direction": "LONG", "price": 50000.0, "confidence": 75.0},
+            {"confidence_score": 72.5, "rating": "★★", "factors": {"technical": 75.0, "sentiment": 70.0, "social": 65.0, "anomaly": 80.0}},
+        )
 
-    def test_batch_trigger(self):
-        """測試批量觸發"""
-        for i in range(5):
-            self.add_to_batch({"id": i})
+        assert "embeds" in captured_request["json"]
+        embed = captured_request["json"]["embeds"][0]
+        assert embed["color"] == 0x00FF00  # 綠色
 
-        assert self.should_send_batch()
+    @patch('httpx.AsyncClient')
+    async def test_sell_signal_embed_color(self, mock_client_class):
+        """測試賣出信號使用紅色"""
+        mock_response = MagicMock()
+        mock_response.status_code = 204
 
-    def test_batch_clear(self):
-        """測試批量清空"""
-        for i in range(5):
-            self.add_to_batch({"id": i})
+        captured_request = {}
 
-        sent = self.clear_batch()
+        async def capture_post(*args, **kwargs):
+            captured_request["json"] = kwargs.get("json", {})
+            return mock_response
 
-        assert len(sent) == 5
-        assert len(self.batch) == 0
+        mock_client_instance = AsyncMock()
+        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+        mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+        mock_client_instance.post = capture_post
+        mock_client_class.return_value = mock_client_instance
+
+        from notification import NotificationManager
+        manager = NotificationManager()
+        manager.webhook_url = self.webhook_url
+
+        await manager.send_signal(
+            "BTCUSDT",
+            {"symbol": "BTCUSDT", "signal": "SELL", "direction": "SHORT", "price": 50000.0, "confidence": 75.0},
+            {"confidence_score": 72.5, "rating": "★★", "factors": {"technical": 75.0, "sentiment": 70.0, "social": 65.0, "anomaly": 80.0}},
+        )
+
+        embed = captured_request["json"]["embeds"][0]
+        assert embed["color"] == 0xFF0000  # 紅色
