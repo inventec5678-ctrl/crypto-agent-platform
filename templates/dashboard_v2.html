@@ -821,6 +821,7 @@ var _twseSearchTimer = null;
 var chart = null;
 var candleSeries = null;
 var lastSuccessfulUpdate = null;
+var _chartResizeHandler = null;
 
 // ── Utilities ──
 function fmt(n, decimals) {
@@ -872,6 +873,18 @@ function setChip(id, val, type) {
 
 // ── TWSE / Market Switching ──
 function switchMarket(market) {
+    // 切換前先銷毀舊 chart 實例，防止記憶體 leak
+    if (window.chart) {
+        window.chart.remove();
+        window.chart = null;
+        window.candleSeries = null;
+    }
+    if (window.twseChart) {
+        window.twseChart.remove();
+        window.twseChart = null;
+        window.twseCandleSeries = null;
+    }
+
     currentMarket = market;
     document.getElementById('btn-crypto').classList.toggle('active', market === 'CRYPTO');
     document.getElementById('btn-twse').classList.toggle('active', market === 'TWSE');
@@ -888,7 +901,7 @@ function switchMarket(market) {
         });
         loadTWSEQuote(currentTWSEStock);
         loadTWSEChart(currentTWSEStock, twseTf);
-    } else {
+    } else if (market === 'CRYPTO') {
         document.querySelectorAll('#crypto-tf-buttons .tf-btn').forEach(function(b) {
             b.classList.toggle('active', b.dataset.tf === currentTF);
         });
@@ -1200,7 +1213,7 @@ function doRankSort() {
 }
 
 function _doRenderModal(s) {
-    var dir = s.direction || 'LONG';
+    var dir = (s.direction || 'LONG').toUpperCase();
     var badgeClass = dir === 'SHORT' ? 'short' : dir === 'LONG' ? 'long' : 'neutral';
     var dirIcon = dir === 'SHORT' ? '🔴' : dir === 'LONG' ? '🟢' : '⚪';
     var wr = s.win_rate || 0;
@@ -1288,43 +1301,28 @@ function _doRenderModal(s) {
         body.innerHTML += paramsHtml;
     }
 
-    // Build entry conditions from params.long / params.short
+        // ── 進場條件（統一 2 層 fallback）────────────────────────────
     var entryConditions = [];
     var p = s.params || s.parameters || {};
     var dir = (s.direction || 'LONG').toUpperCase();
 
+    // Layer 1: 從 params.long / params.short 讀取
     var condObj = dir === 'SHORT' ? (p.short || p) : (p.long || p);
     if (condObj && typeof condObj === 'object') {
         for (var ck in condObj) {
             if (condObj[ck] === true) {
-                // Format key: snake_case → "Readabl Case"
                 var readable = ck.replace(/_/g, ' ').replace(/\b\w/g, function(l){ return l.toUpperCase(); });
                 entryConditions.push(readable);
             }
         }
     }
 
-    // Fallback: if still empty, use s.entry_conditions or s.conditions directly
+    // Layer 2: 從 entry_conditions 直接讀取（Researcher 策略）
     if (entryConditions.length === 0) {
-        var fallback = s.entry_conditions || s.conditions || [];
-        if (typeof fallback === 'string') fallback = [fallback];
-        if (Array.isArray(fallback) && fallback.length > 0) {
-            entryConditions = fallback;
-        }
-    }
-    // Final fallback: try reading entry_conditions from s directly (for researcher strategies)
-    if (entryConditions.length === 0) {
-        var ec = s.entry_conditions;
+        var ec = s.entry_conditions || s.conditions || [];
         if (typeof ec === 'string') ec = [ec];
         if (Array.isArray(ec) && ec.length > 0) {
             entryConditions = ec;
-        }
-    }
-    // Last resort fallback: use s.signal as a condition
-    if (entryConditions.length === 0 && s.signal) {
-        var sig = s.signal;
-        if (typeof sig === 'string' && sig.length > 0) {
-            entryConditions = [sig];
         }
     }
     if (entryConditions.length > 0) {
@@ -1593,11 +1591,15 @@ function initChart() {
         wickUpColor: '#3FB950',
         wickDownColor: '#F85149',
     });
-    window.addEventListener('resize', function() {
+    if (_chartResizeHandler) {
+        window.removeEventListener('resize', _chartResizeHandler);
+    }
+    _chartResizeHandler = function() {
         if (chart && container) {
             chart.applyOptions({ width: container.clientWidth });
         }
-    });
+    };
+    window.addEventListener('resize', _chartResizeHandler);
 }
 
 function loadChartData(sym, tf) {
