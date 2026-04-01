@@ -623,10 +623,6 @@
                                     <option value="2885">2885 元大金</option>
                                     <option value="2618">2618 東畸</option>
                                 </select>
-                                <div style="position:relative">
-                                    <input id="twse-search-input-v2" type="text" placeholder="搜尋股票..." style="background:var(--bg-tertiary);border:1px solid var(--border-color);color:var(--text-primary);border-radius:6px;padding:3px 8px;font-size:11px;width:120px;font-family:var(--font-mono)">
-                                    <div id="twse-search-results-v2" style="display:none;position:absolute;top:100%;left:0;z-index:200;background:var(--bg-card);border:1px solid var(--border-color);border-radius:6px;min-width:180px;max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.4);margin-top:4px"></div>
-                                </div>
                                 <span id="twse-price-v2" class="chart-price">—</span>
                                 <span id="twse-change-v2" style="font-size:11px;margin-left:6px;font-family:var(--font-mono)">—</span>
                                 <span id="twse-volume-v2" style="font-size:10px;color:var(--text-muted);margin-left:6px"></span>
@@ -678,10 +674,7 @@ function clearPriceLines() {
 
 function togglePriceLine(type) {
     var s = window._activeModalStrategy || window._currentStrategy;
-    if (!s) {
-        console.log('[togglePriceLine] No strategy selected');
-        return;
-    }
+    if (!s) return;
     // Clear previous lines of this type
     if (window._priceLines) {
         window._priceLines.forEach(function(line) {
@@ -732,7 +725,6 @@ function togglePriceLine(type) {
                     title: title,
                 });
                 window._maLineSeries.setData(maData);
-                window._priceLines._maLine = true;
                 window._priceLines.push(window._maLineSeries);
                 window._activePriceLines['ma'] = title;
                 if (chart) chart.timeScale().fitContent();
@@ -741,7 +733,7 @@ function togglePriceLine(type) {
                 return;
             }
         }
-        console.log('[togglePriceLine] MA: not enough data or no chart');
+
         return;
     } else if (type === 'rsi') {
         // RSI overlay: compute from close prices
@@ -786,15 +778,13 @@ function togglePriceLine(type) {
                 return;
             }
         }
-        console.log('[togglePriceLine] RSI: not enough data');
+
         return;
     } else {
-        console.log('[togglePriceLine] Unknown type:', type);
         return;
     }
 
     if (!price) {
-        console.log('[togglePriceLine] No price for type:', type);
         return;
     }
 
@@ -818,7 +808,6 @@ function togglePriceLine(type) {
     if (clearBtn) clearBtn.style.display = 'inline';
 
     if (chart) chart.timeScale().fitContent();
-    console.log('[togglePriceLine] Drew', type, 'line at', price);
 }
 </script>
 
@@ -1142,13 +1131,11 @@ var _rankSortAsc = false;
 var _activePriceLines = {};
 
 function renderRankingTable(strategies) {
-    console.log('[DEBUG] renderRankingTable called, strategies:', (strategies||[]).length);
     _rankStrategies = strategies || [];
     doRankSort();
 }
 
 function rankSetSort(key) {
-    console.log('[DEBUG] rankSetSort called, key:', key);
     if (_rankSortKey === key) {
         _rankSortAsc = !_rankSortAsc;
     } else {
@@ -1210,15 +1197,6 @@ function doRankSort() {
         html += '</tr>';
     });
     tbody.innerHTML = html;
-}
-
-function openStrategyModal(idx) {
-    console.log('[DEBUG] openStrategyModal called, idx:', idx, '_rankStrategies length:', _rankStrategies.length);
-    var s = _rankStrategies[idx];
-    if (!s) return;
-    _doRenderModal(s);
-    document.getElementById('modal-title').textContent = s.name || '策略詳情';
-    document.getElementById('strategy-modal').classList.add('open');
 }
 
 function _doRenderModal(s) {
@@ -1314,7 +1292,7 @@ function _doRenderModal(s) {
     var entryConditions = [];
     var p = s.params || s.parameters || {};
     var dir = (s.direction || 'LONG').toUpperCase();
-    console.log('[DEBUG] _doRenderModal strategy:', s.name, '| direction:', dir, '| params:', JSON.stringify(p).substring(0, 100));
+
     var condObj = dir === 'SHORT' ? (p.short || p) : (p.long || p);
     if (condObj && typeof condObj === 'object') {
         for (var ck in condObj) {
@@ -1325,7 +1303,7 @@ function _doRenderModal(s) {
             }
         }
     }
-    console.log('[DEBUG] entryConditions count:', entryConditions.length, entryConditions);
+
     // Fallback: if still empty, use s.entry_conditions or s.conditions directly
     if (entryConditions.length === 0) {
         var fallback = s.entry_conditions || s.conditions || [];
@@ -1417,10 +1395,7 @@ function openStrategyModalById(id) {
         }
     }
     if (s) {
-        // Reuse openStrategyModal logic via _doRenderModal
         _doRenderModal(s);
-        document.getElementById('modal-title').textContent = s.name || '策略詳情';
-        document.getElementById('strategy-modal').classList.add('open');
     }
 }
 
