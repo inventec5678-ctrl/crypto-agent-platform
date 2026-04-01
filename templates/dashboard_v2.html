@@ -1228,7 +1228,7 @@ function doRankSort() {
         var pfClass = pf >= 3 ? 'good' : pf >= 2 ? 'warn' : 'bad';
         var rowClass = rankClass + ' ' + (dir === 'LONG' ? 'row-long' : dir === 'SHORT' ? 'row-short' : '');
 
-        html += '<tr class="' + rowClass + '" onclick="openStrategyModalById(\'' + s.strategy_id + '\')" title="點擊查看詳情">';
+        html += '<tr class="' + rowClass + '" data-sid="' + s.strategy_id + '" title="點擊查看詳情">';
         html += '<td class="rank-num">' + rank + '</td>';
         html += '<td colspan="2"><div class="rank-name-cell"><div class="rank-name">' + (s.name || '?') + '</div><div class="rank-tf">' + (s.timeframe || '') + '</div></div></td>';
         html += '<td><span class="rank-badge ' + badgeClass + '">' + dirIcon + ' ' + dir + '</span></td>';
@@ -1788,6 +1788,15 @@ function switchTab(tab) {
     // ESC key closes modal
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') closeStrategyModal();
+    });
+
+    // Document-level click listener for strategy table rows (fallback if inline onclick fails)
+    document.addEventListener('click', function(e) {
+        var tr = e.target.closest('tr[data-sid]');
+        if (tr) {
+            var id = tr.getAttribute('data-sid');
+            if (id) openStrategyModalById(id);
+        }
     });
 </script>
 </body>
