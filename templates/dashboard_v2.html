@@ -435,7 +435,7 @@
                     <span id="update-time">連接中...</span>
                 </div>
                 <div class="chart-tf" style="gap:2px;">
-                    <button class="tf-btn" >☰</button>
+                    <!-- hamburger removed -->
                 </div>
             </div>
         </div>
@@ -495,7 +495,6 @@
                                     <th>策略名稱</th>
                                     <th>時間軸</th>
                                     <th>方向</th>
-                                    <th>條件</th>
                                     <th class="sortable" data-sort="match_pct">信心度 ↕</th>
                                     <th class="sortable" data-sort="win_rate">勝率 ↕</th>
                                     <th class="sortable" data-sort="profit_factor">盈虧比 ↕</th>
@@ -930,6 +929,11 @@ function loadTWSEQuote(stockCode) {
 function onTWSEStockChange(code) {
     currentMarket = 'TWSE';
     currentTWSEStock = code;
+    // Sync both TWSE selects
+    var sel1 = document.getElementById('twse-stock-select');
+    var sel2 = document.getElementById('twse-stock-select-v2');
+    if (sel1) sel1.value = code;
+    if (sel2) sel2.value = code;
     var twseTf = 'D';
     document.querySelectorAll('#twse-tf-buttons .tf-btn').forEach(function(b) {
         if (b.classList.contains('active')) twseTf = b.dataset.tf;
@@ -1198,21 +1202,23 @@ function doRankSort() {
 
         html += '<tr class="' + rowClass + '" onclick="openStrategyModalById(\'' + s.strategy_id + '\')" title="點擊查看詳情">';
         html += '<td class="rank-num">' + rank + '</td>';
-        html += '<td><div class="rank-name-cell"><div class="rank-name">' + (s.name || '?') + '</div><div class="rank-tf">' + (s.timeframe || '') + '</div></div></td>';
-        html += '<td>' + (s.timeframe || '—') + '</td>';
+        html += '<td colspan="2"><div class="rank-name-cell"><div class="rank-name">' + (s.name || '?') + '</div><div class="rank-tf">' + (s.timeframe || '') + '</div></div></td>';
         html += '<td><span class="rank-badge ' + badgeClass + '">' + dirIcon + ' ' + dir + '</span></td>';
+        html += '<td><span class="rank-conditions">' + (s.entry_conditions ? s.entry_conditions.slice(0,3).join('·') : '—') + '</span></td>';
         html += '<td><span class="rank-pct ' + matchClass + '">' + matchPct + '%</span></td>';
         html += '<td><span class="rank-metric ' + wrClass + '">' + wr.toFixed(1) + '%</span></td>';
         html += '<td><span class="rank-metric ' + pfClass + '">' + pf.toFixed(2) + '</span></td>';
         html += '<td><span class="rank-metric ' + ddClass + '">' + dd.toFixed(1) + '%</span></td>';
         html += '<td><span class="rank-metric ' + (sharpe >= 2 ? 'good' : sharpe >= 1 ? 'warn' : 'bad') + '">' + sharpe.toFixed(2) + '</span></td>';
+        html += '<td><span class="rank-entry">' + (s.entry_conditions ? s.entry_conditions.length + ' 筆' : '—') + '</span></td>';
         html += '<td><span class="rank-entry">' + fmtPrice(s.entry_price) + '</span></td>';
         html += '</tr>';
     });
     tbody.innerHTML = html;
 }
 
-function _doRenderModal(s) {
+// ── Modal sub-renderers ──
+function _renderModalMetrics(s) {
     var dir = (s.direction || 'LONG').toUpperCase();
     var badgeClass = dir === 'SHORT' ? 'short' : dir === 'LONG' ? 'long' : 'neutral';
     var dirIcon = dir === 'SHORT' ? '🔴' : dir === 'LONG' ? '🟢' : '⚪';
@@ -1221,16 +1227,13 @@ function _doRenderModal(s) {
     var dd = s.max_drawdown || 0;
     var sharpe = s.sharpe || 0;
     var matchPct = s.match_pct || 0;
-    var matched = s.matched || [];
     var conditions = [];
     if (s.matched_conditions && s.total_conditions) {
         conditions.push(s.matched_conditions + '/' + s.total_conditions + ' 條件滿足');
     }
     if (s.signal) conditions.push('信號: ' + s.signal);
     if (s.confidence) conditions.push('信心: ' + s.confidence);
-
-    var body = document.getElementById('modal-body');
-    body.innerHTML = '\
+    return '\
         <div class="modal-section">\
             <div class="modal-section-title">策略概覽</div>\
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">\
@@ -1245,6 +1248,15 @@ function _doRenderModal(s) {
                 <div class="modal-metric"><div class="modal-metric-label">Sharpe</div><div class="modal-metric-value ' + (sharpe>=2?'good':sharpe>=1?'warn':'bad') + '">' + sharpe.toFixed(2) + '</div></div>\
             </div>\
         </div>\
+        ' + (conditions.length ? '\
+        <div class="modal-section">\
+            <div class="modal-section-title">觸發條件</div>\
+            <div class="modal-tags">' + conditions.map(function(c){ return '<span class="modal-tag">' + c + '</span>'; }).join('') + '</div>\
+        </div>' : '');
+}
+
+function _renderModalPrices(s) {
+    return '\
         <div class="modal-section">\
             <div class="modal-section-title">進場 / 止盈 / 止損</div>\
             <div class="modal-prices">\
@@ -1257,11 +1269,6 @@ function _doRenderModal(s) {
                 <div class="modal-price-card"><div class="modal-price-label">SL%</div><div class="modal-price-value sl">' + (s.sl_pct ? s.sl_pct.toFixed(1) + '%' : '—') + '</div></div>\
             </div>\
         </div>\
-        ' + (conditions.length ? '\
-        <div class="modal-section">\
-            <div class="modal-section-title">觸發條件</div>\
-            <div class="modal-tags">' + conditions.map(function(c){ return '<span class="modal-tag">' + c + '</span>'; }).join('') + '</div>\
-        </div>' : '') + '\
         ' + (s.reason ? '\
         <div class="modal-section">\
             <div class="modal-section-title">原因</div>\
@@ -1282,10 +1289,83 @@ function _doRenderModal(s) {
                 <button class="modal-chart-btn" onclick="togglePriceLine(\'rsi\')">📊 RSI</button>\
                 <button class="modal-chart-btn" onclick="clearPriceLines()">清除</button>\
             </div>\
-        </div>\
-    ';
+        </div>';
+}
 
-    // Append strategy parameters section
+function _renderModalConditions(s) {
+    var p = s.params || s.parameters || {};
+    var dir = (s.direction || 'LONG').toUpperCase();
+    var entryConditions = [];
+
+    // Layer 1: from params.long / params.short
+    var condObj = dir === 'SHORT' ? (p.short || p) : (p.long || p);
+    if (condObj && typeof condObj === 'object') {
+        for (var ck in condObj) {
+            if (condObj[ck] === true) {
+                var readable = ck.replace(/_/g, ' ').replace(/\b\w/g, function(l){ return l.toUpperCase(); });
+                entryConditions.push(readable);
+            }
+        }
+    }
+
+    // Layer 2: from entry_conditions directly
+    if (entryConditions.length === 0) {
+        var ec = s.entry_conditions || s.conditions || [];
+        if (typeof ec === 'string') ec = [ec];
+        if (Array.isArray(ec) && ec.length > 0) {
+            entryConditions = ec;
+        }
+    }
+
+    if (entryConditions.length === 0) return '';
+
+    var ind = window._currentIndicators || {};
+    var rsi = ind.rsi || 50;
+    var macd_bull = ind.macd_bull || false;
+    var price_above_ma20 = ind.price_above_ma20 || false;
+    var price_above_ma50 = ind.price_above_ma50 || false;
+    var vol_ratio = ind.vol_ratio || 1;
+    var momentum = ind.momentum_7d || 0;
+    var evalCondition = function(cond) {
+        if (!cond) return false;
+        var lower = cond.toLowerCase();
+        if (lower.includes('rsi') && lower.includes('<')) {
+            var match = cond.match(/<?(\d+)/);
+            if (match) return rsi < parseFloat(match[1]);
+        }
+        if (lower.includes('rsi') && lower.includes('>')) {
+            var match = cond.match(/>?(\d+)/);
+            if (match) return rsi > parseFloat(match[1]);
+        }
+        if (lower.includes('ma20') && lower.includes('above')) return price_above_ma20;
+        if (lower.includes('ma50') && lower.includes('above')) return price_above_ma50;
+        if (lower.includes('vol') && (lower.includes('>') || lower.includes('high') || lower.includes('up'))) return vol_ratio > 1.5;
+        if (lower.includes('vol') && lower.includes('<')) return vol_ratio < 0.5;
+        if (lower.includes('macd') && lower.includes('bull')) return macd_bull;
+        if (lower.includes('momentum') && lower.includes('>')) return momentum > 0;
+        if (lower.includes('momentum') && lower.includes('<')) return momentum < 0;
+        return false;
+    };
+    var condHtml = '<div class="modal-section">';
+    condHtml += '<div class="modal-section-title">進場條件</div>';
+    entryConditions.forEach(function(cond) {
+        var satisfied = evalCondition(cond);
+        var color = satisfied ? '#3FB950' : '#555';
+        var bg = satisfied ? 'rgba(63,185,80,0.1)' : 'rgba(50,50,50,0.3)';
+        condHtml += '<div class="cond-item" style="background:' + bg + '">';
+        condHtml += '<span style="color:' + color + ';font-size:16px">' + (satisfied ? '✅' : '⚪') + '</span>';
+        condHtml += '<span style="color:' + (satisfied ? '#3FB950' : '#8B949E') + ';font-size:13px">' + cond + '</span>';
+        condHtml += '</div>';
+    });
+    condHtml += '</div>';
+    return condHtml;
+}
+
+function _doRenderModal(s) {
+    var body = document.getElementById('modal-body');
+    var html = _renderModalMetrics(s) + _renderModalPrices(s);
+
+    // Strategy parameters
     var params = s.parameters || {};
     if (Object.keys(params).length > 0) {
         var paramsHtml = '<div class="modal-section">';
@@ -1298,78 +1378,14 @@ function _doRenderModal(s) {
             paramsHtml += '</div>';
         }
         paramsHtml += '</div></div>';
-        body.innerHTML += paramsHtml;
+        html += paramsHtml;
     }
 
-        // ── 進場條件（統一 2 層 fallback）────────────────────────────
-    var entryConditions = [];
-    var p = s.params || s.parameters || {};
-    var dir = (s.direction || 'LONG').toUpperCase();
-
-    // Layer 1: 從 params.long / params.short 讀取
-    var condObj = dir === 'SHORT' ? (p.short || p) : (p.long || p);
-    if (condObj && typeof condObj === 'object') {
-        for (var ck in condObj) {
-            if (condObj[ck] === true) {
-                var readable = ck.replace(/_/g, ' ').replace(/\b\w/g, function(l){ return l.toUpperCase(); });
-                entryConditions.push(readable);
-            }
-        }
-    }
-
-    // Layer 2: 從 entry_conditions 直接讀取（Researcher 策略）
-    if (entryConditions.length === 0) {
-        var ec = s.entry_conditions || s.conditions || [];
-        if (typeof ec === 'string') ec = [ec];
-        if (Array.isArray(ec) && ec.length > 0) {
-            entryConditions = ec;
-        }
-    }
-    if (entryConditions.length > 0) {
-        var ind = window._currentIndicators || {};
-        var rsi = ind.rsi || 50;
-        var macd_bull = ind.macd_bull || false;
-        var price_above_ma20 = ind.price_above_ma20 || false;
-        var price_above_ma50 = ind.price_above_ma50 || false;
-        var vol_ratio = ind.vol_ratio || 1;
-        var momentum = ind.momentum_7d || 0;
-        var evalCondition = function(cond) {
-            if (!cond) return false;
-            var lower = cond.toLowerCase();
-            if (lower.includes('rsi') && lower.includes('<')) {
-                var match = cond.match(/<?(\d+)/);
-                if (match) return rsi < parseFloat(match[1]);
-            }
-            if (lower.includes('rsi') && lower.includes('>')) {
-                var match = cond.match(/>?(\d+)/);
-                if (match) return rsi > parseFloat(match[1]);
-            }
-            if (lower.includes('ma20') && lower.includes('above')) return price_above_ma20;
-            if (lower.includes('ma50') && lower.includes('above')) return price_above_ma50;
-            if (lower.includes('vol') && (lower.includes('>') || lower.includes('high') || lower.includes('up'))) return vol_ratio > 1.5;
-            if (lower.includes('vol') && lower.includes('<')) return vol_ratio < 0.5;
-            if (lower.includes('macd') && lower.includes('bull')) return macd_bull;
-            if (lower.includes('momentum') && lower.includes('>')) return momentum > 0;
-            if (lower.includes('momentum') && lower.includes('<')) return momentum < 0;
-            return false;
-        };
-        var condHtml = '<div class="modal-section">';
-        condHtml += '<div class="modal-section-title">進場條件</div>';
-        entryConditions.forEach(function(cond) {
-            var satisfied = evalCondition(cond);
-            var color = satisfied ? '#3FB950' : '#555';
-            var bg = satisfied ? 'rgba(63,185,80,0.1)' : 'rgba(50,50,50,0.3)';
-            condHtml += '<div class="cond-item" style="background:' + bg + '">';
-            condHtml += '<span style="color:' + color + ';font-size:16px">' + (satisfied ? '✅' : '⚪') + '</span>';
-            condHtml += '<span style="color:' + (satisfied ? '#3FB950' : '#8B949E') + ';font-size:13px">' + cond + '</span>';
-            condHtml += '</div>';
-        });
-        condHtml += '</div>';
-        body.innerHTML += condHtml;
-    }
+    html += _renderModalConditions(s);
+    body.innerHTML = html;
 
     window._activeModalStrategy = s;
-    window._currentStrategy = s;  // for togglePriceLine to reference
+    window._currentStrategy = s;
     clearPriceLines();
     document.getElementById('modal-title').textContent = s.name || '策略詳情';
     document.getElementById('strategy-modal').classList.add('open');
@@ -1436,7 +1452,7 @@ function renderAnomalyPanels(data) {
         volHtml += '<span class="anomaly-row-icon">' + (v.emoji || '✅') + '</span>';
         volHtml += '<span class="anomaly-row-sym">' + v.symbol + '</span>';
         volHtml += '<span class="anomaly-row-ratio ' + ratioClass + '">' + v.ratio + 'x</span>';
-        volHtml += '<span class="anomaly-row-detail">' + (v.today_volume ? '均' + fmtNum(v.avg_volume) : '') + '</span>';
+        volHtml += '<span class="anomaly-row-detail">' + (v.today_volume ? fmtNum(v.today_volume) : (v.avg_volume ? '均' + fmtNum(v.avg_volume) : '')) + '</span>';
         volHtml += '</div>';
     });
     if (volHtml) volList.innerHTML = volHtml;
@@ -1725,15 +1741,22 @@ function switchTab(tab) {
         }, 10);
     }
 
-    // Stale check
+    // Stale check with auto-retry
     setInterval(function() {
         if (lastSuccessfulUpdate) {
             var elapsed = Math.floor((Date.now() - lastSuccessfulUpdate.getTime()) / 1000);
             if (elapsed > 90) {
                 updateBadge('stale', '逾期 ' + Math.floor(elapsed/60) + 'm');
+                loadStrategies();
+                loadAnomalies();
             }
         }
     }, 30000);
+
+    // ESC key closes modal
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeStrategyModal();
+    });
 </script>
 </body>
 
