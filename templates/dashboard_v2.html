@@ -205,6 +205,18 @@
         .rank-metric.warn { color: var(--accent-yellow); }
         .rank-metric.bad { color: var(--accent-red); }
         .rank-entry { font-weight: 600; font-family: var(--font-mono); font-size: 12px; color: var(--accent-cyan); }
+        .rank-conditions { font-size: 10px; line-height: 1.4; min-width: 180px; max-width: 220px; }
+        .rank-conditions .cond-item { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; }
+        .rank-conditions .cond-item .dot { font-size: 11px; }
+        .rank-conditions .cond-item.satisfied { color: #3FB950; }
+        .rank-conditions .cond-item.unsatisfied { color: #555; }
+        .rank-conditions .cond-item.empty { color: var(--text-muted); font-size: 10px; }
+        .cond-badge { font-size:11px; padding:2px 6px; border-radius:4px; font-weight:600; }
+        .cond-badge.green { background:rgba(63,185,80,0.2); color:#3FB950; }
+        .cond-badge.yellow { background:rgba(234,179,8,0.2); color:#EAB308; }
+        .cond-badge.gray { background:rgba(100,100,100,0.2); color:#8B949E; }
+        .modal-conditions { margin-top: 12px; }
+        .cond-item { display:flex; align-items:center; gap:8px; padding:8px; border-radius:6px; margin-bottom:6px; }
 
         /* ── Strategy Detail Modal ── */
         .modal-overlay {
@@ -430,10 +442,9 @@
 
         <!-- Tab Bar -->
         <div style="background:var(--bg-secondary);border-bottom:1px solid var(--border-color);padding:0 24px;display:flex;gap:2px;">
-            <button onclick="switchTab('crypto')" id="tab-btn-crypto" style="background:#333;color:#fff;border:none;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;border-radius:6px 6px 0 0;">🪙 Crypto</button>
-            <button onclick="switchTab('twse')" id="tab-btn-twse" style="background:transparent;color:var(--text-muted);border:none;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;border-radius:6px 6px 0 0;">🏦 台股</button>
-            <button onclick="switchTab('strategies')" id="tab-btn-strategies" style="background:transparent;color:var(--text-muted);border:none;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;border-radius:6px 6px 0 0;">📊 策略庫</button>
-        </div>
+            <button onclick="switchMarket('CRYPTO')" id="tab-btn-crypto" style="background:#333;color:#fff;border:none;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;border-radius:6px 6px 0 0;">🪙 Crypto</button>
+            <button onclick="switchMarket('TWSE')" id="tab-btn-twse" style="background:transparent;color:var(--text-muted);border:none;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;border-radius:6px 6px 0 0;">🏦 台股</button>
+                    </div>
 
         <div class="page">
             <!-- Crypto Tab (default visible) -->
@@ -484,16 +495,18 @@
                                     <th>策略名稱</th>
                                     <th>時間軸</th>
                                     <th>方向</th>
+                                    <th>條件</th>
                                     <th class="sortable" data-sort="match_pct">信心度 ↕</th>
                                     <th class="sortable" data-sort="win_rate">勝率 ↕</th>
                                     <th class="sortable" data-sort="profit_factor">盈虧比 ↕</th>
                                     <th class="sortable" data-sort="max_drawdown">最大回撤 ↕</th>
                                     <th class="sortable" data-sort="sharpe">Sharpe ↕</th>
+                                    <th>進場條件</th>
                                     <th>進場價</th>
                                 </tr>
                             </thead>
                             <tbody id="rank-tbody">
-                                <tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text-muted)">載入中...</td></tr>
+                                <tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text-muted)">載入中...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -619,22 +632,12 @@
                                 <span id="twse-volume-v2" style="font-size:10px;color:var(--text-muted);margin-left:6px"></span>
                             </div>
                             <div class="chart-tf">
-                                <button class="tf-btn active" data-tf="D" onclick="loadTWSEChartV2('D')">日</button>
-                                <button class="tf-btn" data-tf="W" onclick="loadTWSEChartV2('W')">週</button>
-                                <button class="tf-btn" data-tf="M" onclick="loadTWSEChartV2('M')">月</button>
+                                <button class="tf-btn active" data-tf="D" onclick="onTWSEStockChange(currentTWSEStock)">日</button>
+                                <button class="tf-btn" data-tf="W" onclick="onTWSEStockChange(currentTWSEStock)">週</button>
+                                <button class="tf-btn" data-tf="M" onclick="onTWSEStockChange(currentTWSEStock)">月</button>
                             </div>
                         </div>
                         <div id="chart-container-twse" style="height:380px"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Strategy Library Tab -->
-            <div id="tab-strategies" class="tab-content" style="display:none;">
-                <div class="section">
-                    <div class="section-title">策略庫</div>
-                    <div id="strategy-list">
-                        <div class="loading">載入中...</div>
                     </div>
                 </div>
             </div>
@@ -655,6 +658,169 @@
 
 <!-- TradingView Lightweight Charts -->
 <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
+
+<script>
+function clearPriceLines() {
+    if (window._priceLines) {
+        window._priceLines.forEach(function(line) {
+            if (line && typeof line.remove === 'function') line.remove();
+        });
+        window._priceLines = [];
+    }
+    // Also remove MA/RSI overlay series
+    if (window._maLineSeries) { window._maLineSeries.remove(); window._maLineSeries = null; }
+    if (window._rsiLineSeries) { window._rsiLineSeries.remove(); window._rsiLineSeries = null; }
+    window._activePriceLines = {};
+    // Hide clear button if no price lines remain
+    var clearBtn = document.getElementById('clear-chart-lines-btn');
+    if (clearBtn) clearBtn.style.display = 'none';
+}
+
+function togglePriceLine(type) {
+    var s = window._activeModalStrategy || window._currentStrategy;
+    if (!s) {
+        console.log('[togglePriceLine] No strategy selected');
+        return;
+    }
+    // Clear previous lines of this type
+    if (window._priceLines) {
+        window._priceLines.forEach(function(line) {
+            if (line && typeof line.remove === 'function') line.remove();
+        });
+        window._priceLines = [];
+    }
+    window._priceLines = [];
+
+    var color, title;
+    var price = null;
+
+    if (type === 'entry') {
+        price = s.entry_price;
+        color = '#58A6FF';
+        title = '📍 Entry';
+    } else if (type === 'tp') {
+        price = s.take_profit;
+        color = '#3FB950';
+        title = '🎯 TP';
+    } else if (type === 'sl') {
+        price = s.stop_loss;
+        color = '#F85149';
+        title = '🛡 SL';
+    } else if (type === 'ma') {
+        // MA overlay: compute from close prices
+        var period = (s.parameters && (s.parameters.ma_period || s.parameters.ma_slow)) || 20;
+        title = 'MA' + period;
+        color = '#D29922';
+        if (candleSeries && window._chartCandleData) {
+            var closes = window._chartCandleData.map(function(d) { return d.close; });
+            if (closes.length >= period) {
+                var maData = [];
+                for (var i = period - 1; i < closes.length; i++) {
+                    var sum = 0;
+                    for (var j = 0; j < period; j++) sum += closes[i - j];
+                    maData.push({ time: window._chartCandleData[i].time, value: sum / period });
+                }
+                if (window._maLineSeries) {
+                    window._maLineSeries.remove();
+                    window._maLineSeries = null;
+                }
+                window._maLineSeries = chart.addLineSeries({
+                    color: color,
+                    lineWidth: 2,
+                    priceLineVisible: false,
+                    lastValueVisible: true,
+                    title: title,
+                });
+                window._maLineSeries.setData(maData);
+                window._priceLines._maLine = true;
+                window._priceLines.push(window._maLineSeries);
+                window._activePriceLines['ma'] = title;
+                if (chart) chart.timeScale().fitContent();
+                var clearBtn = document.getElementById('clear-chart-lines-btn');
+                if (clearBtn) clearBtn.style.display = 'inline';
+                return;
+            }
+        }
+        console.log('[togglePriceLine] MA: not enough data or no chart');
+        return;
+    } else if (type === 'rsi') {
+        // RSI overlay: compute from close prices
+        title = 'RSI14';
+        color = '#A371F7';
+        if (candleSeries && window._chartCandleData) {
+            var closes = window._chartCandleData.map(function(d) { return d.close; });
+            if (closes.length >= 14) {
+                var rsiData = [];
+                var gains = [], losses = [];
+                for (var i = 1; i < closes.length; i++) {
+                    var diff = closes[i] - closes[i-1];
+                    gains.push(diff > 0 ? diff : 0);
+                    losses.push(diff < 0 ? -diff : 0);
+                }
+                for (var i = 13; i < gains.length; i++) {
+                    var avgGain = 0, avgLoss = 0;
+                    for (var j = i-13; j <= i; j++) { avgGain += gains[j]; avgLoss += losses[j]; }
+                    avgGain /= 14; avgLoss /= 14;
+                    var rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+                    var rsiVal = 100 - (100 / (1 + rs));
+                    rsiData.push({ time: window._chartCandleData[i+1].time, value: rsiVal });
+                }
+                if (window._rsiLineSeries) {
+                    window._rsiLineSeries.remove();
+                    window._rsiLineSeries = null;
+                }
+                // RSI needs its own pane — create price line markers as approximation
+                window._rsiLineSeries = chart.addLineSeries({
+                    color: color,
+                    lineWidth: 2,
+                    priceLineVisible: false,
+                    lastValueVisible: true,
+                    title: title,
+                });
+                window._rsiLineSeries.setData(rsiData);
+                window._priceLines.push(window._rsiLineSeries);
+                window._activePriceLines['rsi'] = title;
+                if (chart) chart.timeScale().fitContent();
+                var clearBtn = document.getElementById('clear-chart-lines-btn');
+                if (clearBtn) clearBtn.style.display = 'inline';
+                return;
+            }
+        }
+        console.log('[togglePriceLine] RSI: not enough data');
+        return;
+    } else {
+        console.log('[togglePriceLine] Unknown type:', type);
+        return;
+    }
+
+    if (!price) {
+        console.log('[togglePriceLine] No price for type:', type);
+        return;
+    }
+
+    // Draw horizontal price line on main chart
+    if (candleSeries) {
+        var lineStyle = LightweightCharts.LineStyle.Dashed;
+        var line = candleSeries.createPriceLine({
+            price: price,
+            color: color,
+            lineWidth: 1,
+            lineStyle: lineStyle,
+            axisLabelVisible: true,
+            title: title
+        });
+        window._priceLines.push(line);
+        window._activePriceLines[type] = price;
+    }
+
+    // Show clear button
+    var clearBtn = document.getElementById('clear-chart-lines-btn');
+    if (clearBtn) clearBtn.style.display = 'inline';
+
+    if (chart) chart.timeScale().fitContent();
+    console.log('[togglePriceLine] Drew', type, 'line at', price);
+}
+</script>
 
 <script>
 var API_BASE = '/api';
@@ -732,11 +898,12 @@ function switchMarket(market) {
             b.classList.toggle('active', b.dataset.tf === twseTf);
         });
         loadTWSEQuote(currentTWSEStock);
-        loadChartData(currentTWSEStock, twseTf);
+        loadTWSEChart(currentTWSEStock, twseTf);
     } else {
         document.querySelectorAll('#crypto-tf-buttons .tf-btn').forEach(function(b) {
             b.classList.toggle('active', b.dataset.tf === currentTF);
         });
+        initChart();
         loadChartData(currentSym, currentTF);
     }
 }
@@ -759,13 +926,67 @@ function loadTWSEQuote(stockCode) {
 }
 
 function onTWSEStockChange(code) {
+    currentMarket = 'TWSE';
     currentTWSEStock = code;
     var twseTf = 'D';
     document.querySelectorAll('#twse-tf-buttons .tf-btn').forEach(function(b) {
         if (b.classList.contains('active')) twseTf = b.dataset.tf;
     });
     loadTWSEQuote(code);
-    loadChartData(code, twseTf);
+    loadTWSEChart(code, twseTf);
+}
+
+function loadTWSEChart(sym, tf) {
+    currentMarket = 'TWSE';
+    var url = API_BASE + '/twse/klines/' + sym + '?interval=' + tf + '&limit=300';
+    fetch(url)
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function(data) {
+            if (!data || !data.length) return;
+            var cdata = data.map(function(d) {
+                return { time: d.time, open: parseFloat(d.open), high: parseFloat(d.high), low: parseFloat(d.low), close: parseFloat(d.close) };
+            });
+            // Use existing TWSE chart or create new one
+            if (!window.twseChart) {
+                var container = document.getElementById('chart-container-twse');
+                if (!container) return;
+                window.twseChart = LightweightCharts.createChart(container, {
+                    width: container.clientWidth, height: 380,
+                    layout: { background: { color: '#161B22' }, textColor: '#8B949E' },
+                    grid: { vertLines: { color: '#1C2128' }, horzLines: { color: '#1C2128' } },
+                    rightPriceScale: { borderColor: '#30363D' },
+                    timeScale: { borderColor: '#30363D', timeVisible: true },
+                });
+                window.twseCandleSeries = window.twseChart.addCandlestickSeries({
+                    upColor: '#3FB950', downColor: '#F85149',
+                    borderUpColor: '#3FB950', borderDownColor: '#F85149',
+                    wickUpColor: '#3FB950', wickDownColor: '#F85149',
+                });
+                window.addEventListener('resize', function() {
+                    if (window.twseChart) {
+                        var c = document.getElementById('chart-container-twse');
+                        if (c) window.twseChart.applyOptions({ width: c.clientWidth });
+                    }
+                });
+            }
+            if (window.twseCandleSeries) window.twseCandleSeries.setData(cdata);
+            if (window.twseChart) window.twseChart.timeScale().fitContent();
+            // Update price display
+            var last = cdata[cdata.length - 1];
+            if (last) {
+                var priceEl = document.getElementById('twse-price-v2');
+                if (priceEl) { priceEl.textContent = last.close.toLocaleString(); priceEl.className = 'chart-price'; }
+                var chgEl = document.getElementById('twse-change-v2');
+                if (chgEl && cdata.length > 1) {
+                    var pct = ((last.close - cdata[0].open) / cdata[0].open * 100);
+                    chgEl.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+                    chgEl.className = pct >= 0 ? 'up' : 'dn';
+                }
+            }
+        })
+        .catch(function(e) {
+            console.error('TWSE chart error', e);
+        });
 }
 
 function onTWSESearchKeyup(e) {
@@ -915,6 +1136,7 @@ function renderStrategyOverview(strategies) {
 
 // ── Strategy Ranking Table ──
 var _rankStrategies = [];
+var _allStrategies = [];
 var _rankSortKey = 'win_rate';
 var _rankSortAsc = false;
 var _activePriceLines = {};
@@ -953,7 +1175,7 @@ function doRankSort() {
     var tbody = document.getElementById('rank-tbody');
     if (!tbody) return;
     if (!sorted.length) {
-        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text-muted)">暫無策略</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text-muted)">暫無策略</td></tr>';
         return;
     }
     var html = '';
@@ -974,7 +1196,7 @@ function doRankSort() {
         var pfClass = pf >= 3 ? 'good' : pf >= 2 ? 'warn' : 'bad';
         var rowClass = rankClass + ' ' + (dir === 'LONG' ? 'row-long' : dir === 'SHORT' ? 'row-short' : '');
 
-        html += '<tr class="' + rowClass + '" onclick="openStrategyModal(' + i + ')" title="點擊查看詳情">';
+        html += '<tr class="' + rowClass + '" onclick="openStrategyModalById(\'' + s.strategy_id + '\')" title="點擊查看詳情">';
         html += '<td class="rank-num">' + rank + '</td>';
         html += '<td><div class="rank-name-cell"><div class="rank-name">' + (s.name || '?') + '</div><div class="rank-tf">' + (s.timeframe || '') + '</div></div></td>';
         html += '<td>' + (s.timeframe || '—') + '</td>';
@@ -994,7 +1216,13 @@ function openStrategyModal(idx) {
     console.log('[DEBUG] openStrategyModal called, idx:', idx, '_rankStrategies length:', _rankStrategies.length);
     var s = _rankStrategies[idx];
     if (!s) return;
-    var dir = s.direction || 'neutral';
+    _doRenderModal(s);
+    document.getElementById('modal-title').textContent = s.name || '策略詳情';
+    document.getElementById('strategy-modal').classList.add('open');
+}
+
+function _doRenderModal(s) {
+    var dir = s.direction || 'LONG';
     var badgeClass = dir === 'SHORT' ? 'short' : dir === 'LONG' ? 'long' : 'neutral';
     var dirIcon = dir === 'SHORT' ? '🔴' : dir === 'LONG' ? '🟢' : '⚪';
     var wr = s.win_rate || 0;
@@ -1059,15 +1287,141 @@ function openStrategyModal(idx) {
                 <button class="modal-chart-btn" onclick="togglePriceLine(\'entry\')">📍 進場線</button>\
                 <button class="modal-chart-btn" onclick="togglePriceLine(\'tp\')">🎯 止盈線</button>\
                 <button class="modal-chart-btn" onclick="togglePriceLine(\'sl\')">🛡 止損線</button>\
+                <button class="modal-chart-btn" onclick="togglePriceLine(\'ma\')">📈 MA</button>\
+                <button class="modal-chart-btn" onclick="togglePriceLine(\'rsi\')">📊 RSI</button>\
                 <button class="modal-chart-btn" onclick="clearPriceLines()">清除</button>\
             </div>\
         </div>\
     ';
 
+    // Append strategy parameters section
+    var params = s.parameters || {};
+    if (Object.keys(params).length > 0) {
+        var paramsHtml = '<div class="modal-section">';
+        paramsHtml += '<div class="modal-section-title">策略參數</div>';
+        paramsHtml += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">';
+        for (var key in params) {
+            paramsHtml += '<div style="background:rgba(50,50,50,0.3);padding:6px 8px;border-radius:4px;font-size:12px">';
+            paramsHtml += '<span style="color:#8B949E">' + key + ':</span> ';
+            paramsHtml += '<span style="color:#fff;font-weight:600">' + params[key] + '</span>';
+            paramsHtml += '</div>';
+        }
+        paramsHtml += '</div></div>';
+        body.innerHTML += paramsHtml;
+    }
+
+    // Build entry conditions from params.long / params.short
+    var entryConditions = [];
+    var p = s.params || s.parameters || {};
+    var dir = (s.direction || 'LONG').toUpperCase();
+    console.log('[DEBUG] _doRenderModal strategy:', s.name, '| direction:', dir, '| params:', JSON.stringify(p).substring(0, 100));
+    var condObj = dir === 'SHORT' ? (p.short || p) : (p.long || p);
+    if (condObj && typeof condObj === 'object') {
+        for (var ck in condObj) {
+            if (condObj[ck] === true) {
+                // Format key: snake_case → "Readabl Case"
+                var readable = ck.replace(/_/g, ' ').replace(/\b\w/g, function(l){ return l.toUpperCase(); });
+                entryConditions.push(readable);
+            }
+        }
+    }
+    console.log('[DEBUG] entryConditions count:', entryConditions.length, entryConditions);
+    // Fallback: if still empty, use s.entry_conditions or s.conditions directly
+    if (entryConditions.length === 0) {
+        var fallback = s.entry_conditions || s.conditions || [];
+        if (typeof fallback === 'string') fallback = [fallback];
+        if (Array.isArray(fallback) && fallback.length > 0) {
+            entryConditions = fallback;
+        }
+    }
+    // Final fallback: try reading entry_conditions from s directly (for researcher strategies)
+    if (entryConditions.length === 0) {
+        var ec = s.entry_conditions;
+        if (typeof ec === 'string') ec = [ec];
+        if (Array.isArray(ec) && ec.length > 0) {
+            entryConditions = ec;
+        }
+    }
+    // Last resort fallback: use s.signal as a condition
+    if (entryConditions.length === 0 && s.signal) {
+        var sig = s.signal;
+        if (typeof sig === 'string' && sig.length > 0) {
+            entryConditions = [sig];
+        }
+    }
+    if (entryConditions.length > 0) {
+        var ind = window._currentIndicators || {};
+        var rsi = ind.rsi || 50;
+        var macd_bull = ind.macd_bull || false;
+        var price_above_ma20 = ind.price_above_ma20 || false;
+        var price_above_ma50 = ind.price_above_ma50 || false;
+        var vol_ratio = ind.vol_ratio || 1;
+        var momentum = ind.momentum_7d || 0;
+        var evalCondition = function(cond) {
+            if (!cond) return false;
+            var lower = cond.toLowerCase();
+            if (lower.includes('rsi') && lower.includes('<')) {
+                var match = cond.match(/<?(\d+)/);
+                if (match) return rsi < parseFloat(match[1]);
+            }
+            if (lower.includes('rsi') && lower.includes('>')) {
+                var match = cond.match(/>?(\d+)/);
+                if (match) return rsi > parseFloat(match[1]);
+            }
+            if (lower.includes('ma20') && lower.includes('above')) return price_above_ma20;
+            if (lower.includes('ma50') && lower.includes('above')) return price_above_ma50;
+            if (lower.includes('vol') && (lower.includes('>') || lower.includes('high') || lower.includes('up'))) return vol_ratio > 1.5;
+            if (lower.includes('vol') && lower.includes('<')) return vol_ratio < 0.5;
+            if (lower.includes('macd') && lower.includes('bull')) return macd_bull;
+            if (lower.includes('momentum') && lower.includes('>')) return momentum > 0;
+            if (lower.includes('momentum') && lower.includes('<')) return momentum < 0;
+            return false;
+        };
+        var condHtml = '<div class="modal-section">';
+        condHtml += '<div class="modal-section-title">進場條件</div>';
+        entryConditions.forEach(function(cond) {
+            var satisfied = evalCondition(cond);
+            var color = satisfied ? '#3FB950' : '#555';
+            var bg = satisfied ? 'rgba(63,185,80,0.1)' : 'rgba(50,50,50,0.3)';
+            condHtml += '<div class="cond-item" style="background:' + bg + '">';
+            condHtml += '<span style="color:' + color + ';font-size:16px">' + (satisfied ? '✅' : '⚪') + '</span>';
+            condHtml += '<span style="color:' + (satisfied ? '#3FB950' : '#8B949E') + ';font-size:13px">' + cond + '</span>';
+            condHtml += '</div>';
+        });
+        condHtml += '</div>';
+        body.innerHTML += condHtml;
+    }
+
     window._activeModalStrategy = s;
+    window._currentStrategy = s;  // for togglePriceLine to reference
     clearPriceLines();
     document.getElementById('modal-title').textContent = s.name || '策略詳情';
     document.getElementById('strategy-modal').classList.add('open');
+}
+
+function openStrategyModalById(id) {
+    var s = null;
+    for (var i = 0; i < _allStrategies.length; i++) {
+        if (_allStrategies[i].strategy_id === id) {
+            s = _allStrategies[i];
+            break;
+        }
+    }
+    if (!s) {
+        // fallback to _rankStrategies
+        for (var i = 0; i < _rankStrategies.length; i++) {
+            if (_rankStrategies[i].strategy_id === id) {
+                s = _rankStrategies[i];
+                break;
+            }
+        }
+    }
+    if (s) {
+        // Reuse openStrategyModal logic via _doRenderModal
+        _doRenderModal(s);
+        document.getElementById('modal-title').textContent = s.name || '策略詳情';
+        document.getElementById('strategy-modal').classList.add('open');
+    }
 }
 
 function closeStrategyModal() {
@@ -1168,35 +1522,65 @@ function loadAnomalies() {
 // ── Load Strategies ──
 function loadStrategies() {
     console.log('[DEBUG] loadStrategies called');
-    fetch(API_BASE + '/strategies/live')
-        .then(function(r) { console.log('[DEBUG] strategies response ok:', r.ok); return r.ok ? r.json() : Promise.reject(r.status); })
-        .then(function(data) {
-            console.log('[DEBUG] strategies data received, count:', (data.strategies||[]).length);
-            renderStrategyOverview(data.strategies || []);
-            renderMarketSentiment(data.indicators || {});
-            renderRankingTable(data.strategies || []);
-
-            var btcPrice = data.btc_price;
-            var ind = data.indicators || {};
-            lastSuccessfulUpdate = new Date();
-            updateBadge('', '更新於 ' + formatTime(lastSuccessfulUpdate));
-
-            renderMarketSentiment(ind);
-
-            // Update chart price
-            if (btcPrice) {
-                var chartPriceEl = document.getElementById('chart-price');
-                if (chartPriceEl) {
-                    chartPriceEl.textContent = fmtPrice(btcPrice);
-                    chartPriceEl.className = 'chart-price';
-                }
+    Promise.all([
+        fetch(API_BASE + '/strategies/live').then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); }),
+        fetch(API_BASE + '/strategies/all').then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    ])
+    .then(function(results) {
+        var liveData = results[0];
+        var allData = results[1];
+        var liveStrategies = liveData.strategies || [];
+        var allStrategies = allData.strategies || [];
+        // Prefer live metrics over stored metrics
+        var liveMetrics = {};
+        var allStrategiesMap = {};
+        allStrategies.forEach(function(s) { allStrategiesMap[s.strategy_id] = s; });
+        liveStrategies.forEach(function(s) { 
+            liveMetrics[s.strategy_id] = s; 
+            // Merge params from allStrategies if available
+            if (allStrategiesMap[s.strategy_id] && allStrategiesMap[s.strategy_id].params) {
+                s.params = allStrategiesMap[s.strategy_id].params;
             }
-
-        })
-        .catch(function(e) {
-            console.error('[DEBUG] strategies fetch failed:', e);
-            updateBadge('stale', '更新失敗');
         });
+        var combined = [];
+        var seen = {};
+        // First add all live strategies (with merged params)
+        liveStrategies.forEach(function(s) {
+            if (!seen[s.strategy_id]) {
+                seen[s.strategy_id] = true;
+                combined.push(s);
+            }
+        });
+        // Then add experiment strategies that aren't in live
+        allStrategies.forEach(function(s) {
+            if (!seen[s.strategy_id] && (s.win_rate || 0) > 0) {
+                seen[s.strategy_id] = true;
+                combined.push(s);
+            }
+        });
+        console.log('[DEBUG] live strategies:', liveStrategies.length, 'all strategies:', allStrategies.length, 'combined:', combined.length);
+        window._allStrategies = combined;  // store complete list for openStrategyModalById
+        renderStrategyOverview(combined);
+        renderMarketSentiment(liveData.indicators || {});
+        renderRankingTable(combined);
+        var btcPrice = liveData.btc_price;
+        var ind = liveData.indicators || {};
+        window._currentIndicators = ind;
+        lastSuccessfulUpdate = new Date();
+        updateBadge('', '更新於 ' + formatTime(lastSuccessfulUpdate));
+        renderMarketSentiment(ind);
+        if (btcPrice) {
+            var chartPriceEl = document.getElementById('chart-price');
+            if (chartPriceEl) {
+                chartPriceEl.textContent = fmtPrice(btcPrice);
+                chartPriceEl.className = 'chart-price';
+            }
+        }
+    })
+    .catch(function(e) {
+        console.error('[DEBUG] strategies fetch failed:', e);
+        updateBadge('stale', '更新失敗');
+    });
 }
 
 // ── Chart ──
@@ -1263,8 +1647,9 @@ function loadChartData(sym, tf) {
                     close: parseFloat(d.close)
                 };
             });
+            window._chartCandleData = cdata;  // store for MA/RSI overlay
             if (candleSeries) candleSeries.setData(cdata);
-            chart.timeScale().fitContent();
+            if (chart) chart.timeScale().fitContent();
 
             if (isTWSE) {
                 // Show TWSE stock code as symbol
@@ -1326,178 +1711,7 @@ function switchTab(tab) {
     // Highlight active tab button
     var btnEl = document.getElementById('tab-btn-' + tab);
     if (btnEl) { btnEl.style.background = '#333'; btnEl.style.color = '#fff'; }
-    // Trigger content load
-    if (tab === 'strategies') loadStrategyLibrary();
-    if (tab === 'twse') initTWSEChartV2();
 }
-
-// ── Strategy Library ──
-async function loadStrategyLibrary() {
-    try {
-        var resp = await fetch('/api/factor_library');
-        var strategies = await resp.json();
-        var container = document.getElementById('strategy-list');
-        if (!strategies || strategies.length === 0) {
-            container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px">尚無策略</p>';
-            return;
-        }
-        var html = '<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; padding:12px;">';
-        for (var i = 0; i < strategies.length; i++) {
-            var s = strategies[i];
-            var m = s.metrics || {};
-            var verified = s.qa_verified ? '✅ QA Verified' : '⚠️ Unverified';
-            var entryConditions = s.entry_conditions || [];
-            html += '<div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:16px;">';
-            html += '<h3 style="margin:0 0 8px 0; color:#fff; font-size:14px;">' + (s.factor_id || s.name || 'Unknown') + '</h3>';
-            html += '<p style="margin:0 0 4px 0; color:#888; font-size:13px;">' + (s.direction || 'LONG') + ' | ' + (s.timeframe || '1D') + '</p>';
-            html += '<div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin:12px 0;">';
-            html += '<div style="background:#0f0f1a; padding:8px; border-radius:4px;"><div style="color:#888; font-size:11px;">勝率</div><div style="color:#4ade80; font-size:18px; font-weight:bold;">' + (m.win_rate ? m.win_rate.toFixed(1) + '%' : 'N/A') + '</div></div>';
-            html += '<div style="background:#0f0f1a; padding:8px; border-radius:4px;"><div style="color:#888; font-size:11px;">盈虧比</div><div style="color:#4ade80; font-size:18px; font-weight:bold;">' + (m.profit_factor ? m.profit_factor.toFixed(2) : 'N/A') + '</div></div>';
-            html += '<div style="background:#0f0f1a; padding:8px; border-radius:4px;"><div style="color:#888; font-size:11px;">最大回撤</div><div style="color:#f87171; font-size:18px; font-weight:bold;">' + (m.max_drawdown ? m.max_drawdown.toFixed(1) + '%' : 'N/A') + '</div></div>';
-            html += '<div style="background:#0f0f1a; padding:8px; border-radius:4px;"><div style="color:#888; font-size:11px;">Sharpe</div><div style="color:#60a5fa; font-size:18px; font-weight:bold;">' + (m.sharpe_ratio ? m.sharpe_ratio.toFixed(2) : 'N/A') + '</div></div>';
-            html += '</div>';
-            html += '<p style="margin:0 0 4px 0; color:#888; font-size:12px;">' + verified + '</p>';
-            if (entryConditions.length > 0) {
-                html += '<details><summary style="color:#60a5fa; cursor:pointer; font-size:13px;">查看進場條件</summary>';
-                html += '<div style="margin-top:8px; padding:8px; background:#0f0f1a; border-radius:4px;">';
-                for (var j = 0; j < entryConditions.length; j++) {
-                    html += '<div style="color:#ccc; font-size:12px;">• ' + entryConditions[j] + '</div>';
-                }
-                html += '</div></details>';
-            }
-            html += '</div>';
-        }
-        html += '</div>';
-        container.innerHTML = html;
-    } catch (e) {
-        document.getElementById('strategy-list').innerHTML = '<p style="color:var(--accent-red);text-align:center;padding:40px">載入失敗: ' + e.message + '</p>';
-    }
-}
-
-// ── TWSE Chart V2 ──
-var twseChartV2 = null;
-var twseCandleSeriesV2 = null;
-function initTWSEChartV2() {
-    var container = document.getElementById('chart-container-twse');
-    if (!container) return;
-    if (twseChartV2) { twseChartV2.remove(); twseChartV2 = null; }
-    twseChartV2 = LightweightCharts.createChart(container, {
-        width: container.clientWidth, height: container.clientHeight,
-        layout: { background: { color: '#161B22' }, textColor: '#8B949E' },
-        grid: { vertLines: { color: '#1C2128' }, horzLines: { color: '#1C2128' } },
-        rightPriceScale: { borderColor: '#30363D' },
-        timeScale: { borderColor: '#30363D', timeVisible: true },
-    });
-    twseCandleSeriesV2 = twseChartV2.addCandlestickSeries({
-        upColor: '#3FB950', downColor: '#F85149',
-        borderUpColor: '#3FB950', borderDownColor: '#F85149',
-        wickUpColor: '#3FB950', wickDownColor: '#F85149',
-    });
-    loadTWSEChartV2('D');
-    window.addEventListener('resize', function() {
-        if (twseChartV2 && container) twseChartV2.applyOptions({ width: container.clientWidth });
-    });
-}
-
-function loadTWSEChartV2(tf) {
-    if (!twseCandleSeriesV2) return;
-    var stock = document.getElementById('twse-stock-select-v2');
-    var code = stock ? stock.value : '2330';
-    fetch(API_BASE + '/twse/klines/' + code + '?interval=' + tf + '&limit=300')
-        .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
-        .then(function(data) {
-            if (!data || !data.length) return;
-            var cdata = data.map(function(d) {
-                return { time: d.time, open: parseFloat(d.open), high: parseFloat(d.high), low: parseFloat(d.low), close: parseFloat(d.close) };
-            });
-            twseCandleSeriesV2.setData(cdata);
-            twseChartV2.timeScale().fitContent();
-        }).catch(function(e) { console.error('TWSE chart error', e); });
-}
-
-// ── Init ──
-
-function copyPrice(btn, val) {
-    if (!val || val === '—' || val === 'null' || val === 'undefined') return;
-    navigator.clipboard.writeText(val.toString()).then(function() {
-        btn.classList.add('copied');
-        var orig = btn.textContent;
-        btn.textContent = '已複製';
-        setTimeout(function() { btn.classList.remove('copied'); btn.textContent = orig; }, 1500);
-    }).catch(function() {});
-}
-
-function updateChartLineButtons() {
-    var hasLines = false;
-    Object.keys(_activePriceLines).forEach(function(k) { if (_activePriceLines[k]) hasLines = true; });
-    var btn = document.getElementById('clear-chart-lines-btn');
-    if (btn) btn.style.display = hasLines ? 'inline-flex' : 'none';
-}
-
-function togglePriceLine(type) {
-    if (!candleSeries) return;
-    var strat = window._activeModalStrategy;
-    if (!strat) return;
-    var price = type === 'entry' ? strat.entry_price : type === 'tp' ? strat.take_profit : strat.stop_loss;
-    if (!price) return;
-    var color = type === 'entry' ? '#39D0D8' : type === 'tp' ? '#3FB950' : '#F85149';
-    var label = type === 'entry' ? '進場' : type === 'tp' ? '止盈' : '止損';
-    if (_activePriceLines[type]) {
-        candleSeries.removePriceLine(_activePriceLines[type]);
-        _activePriceLines[type] = null;
-        document.querySelectorAll('.modal-chart-btn').forEach(function(b) { if (b.textContent.includes(label)) b.classList.remove('active'); });
-        updateChartLineButtons();
-        return;
-    }
-    var line = candleSeries.createPriceLine({ price: price, color: color, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: label });
-    _activePriceLines[type] = line;
-    document.querySelectorAll('.modal-chart-btn').forEach(function(b) { if (b.textContent.includes(label)) b.classList.add('active'); });
-    updateChartLineButtons();
-}
-
-function clearPriceLines() {
-    if (!candleSeries) return;
-    Object.keys(_activePriceLines).forEach(function(k) {
-        if (_activePriceLines[k]) { candleSeries.removePriceLine(_activePriceLines[k]); _activePriceLines[k] = null; }
-    });
-    document.querySelectorAll('.modal-chart-btn').forEach(function(b) { b.classList.remove('active'); });
-    updateChartLineButtons();
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    initChart();
-    loadChartData('BTC', '4h');
-    loadStrategies();
-    loadAnomalies();
-    // Initialize tab system - show Crypto tab by default
-    switchTab('crypto');
-
-    // Auto-refresh every 60s
-    // Unified 60s refresh with countdown timer
-    var _refreshCountdown = 60;
-    var _countdownTimer = null;
-    function startCountdown() {
-        _refreshCountdown = 60;
-        clearInterval(_countdownTimer);
-        _countdownTimer = setInterval(function() {
-            _refreshCountdown--;
-            var badge = document.getElementById('update-badge');
-            if (badge) {
-                document.getElementById('update-time').textContent = '下次更新 ' + _refreshCountdown + 's';
-                badge.className = 'update-badge';
-            }
-            if (_refreshCountdown <= 0) {
-                loadStrategies();
-                loadAnomalies();
-                startCountdown();
-            }
-        }, 1000);
-    }
-    startCountdown();
-    document.addEventListener('visibilitychange', function() {
-        if (document.hidden) { clearInterval(_countdownTimer); }
-        else { startCountdown(); }
-    });
 
     // Crypto TF buttons
     document.querySelectorAll('#crypto-tf-buttons .tf-btn').forEach(function(btn) {
@@ -1519,6 +1733,21 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // Initialize on page load (wait for DOM ready)
+    document.addEventListener('DOMContentLoaded', function() {
+        switchMarket('CRYPTO');
+        loadStrategies();
+        loadAnomalies();
+    });
+    // Fallback: run immediately if DOM already loaded
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        setTimeout(function() {
+            switchMarket('CRYPTO');
+            loadStrategies();
+            loadAnomalies();
+        }, 10);
+    }
+
     // Stale check
     setInterval(function() {
         if (lastSuccessfulUpdate) {
@@ -1528,7 +1757,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     }, 30000);
-});
 </script>
 </body>
 
