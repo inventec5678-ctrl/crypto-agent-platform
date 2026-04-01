@@ -92,5 +92,109 @@
       "sharpe": 2.5065042035306937
     },
     "reason": "wr=61.5% pf=1.84 dd=3.4 sharpe=2.51"
+  },
+  {
+    "round": 1,
+    "strategy": "ArcBreak15",
+    "params": {
+      "extremes_lookback": 15
+    },
+    "metrics": {
+      "wr": 0.0,
+      "pf": 0.0,
+      "dd": 0.0,
+      "sharpe": 0.0
+    },
+    "reason": "wr=0.0% pf=0.00 dd=0.0 sharpe=0.00"
+  },
+  {
+    "round": 2,
+    "strategy": "FluxDrop12",
+    "params": {
+      "reversal_lookback": 12,
+      "body_ratio": 0.54
+    },
+    "metrics": {
+      "wr": 33.33333333333333,
+      "pf": 1.617017767649684,
+      "dd": 0.33249033314727505,
+      "sharpe": 0.48318169551645296
+    },
+    "reason": "wr=33.3% pf=1.62 dd=0.3 sharpe=0.48"
+  },
+  {
+    "round": 3,
+    "strategy": "RidgeFlow4",
+    "params": {
+      "momentum_lookback": 4,
+      "momentum_thresh": 0.01
+    },
+    "metrics": {
+      "wr": 54.22077922077923,
+      "pf": 1.6073638537738348,
+      "dd": 8.183832339220661,
+      "sharpe": 5.055329307865415
+    },
+    "reason": "wr=54.2% pf=1.61 dd=8.2 sharpe=5.06"
+  },
+  {
+    "round": 1,
+    "strategy": "NovaSwipe15",
+    "params": {
+      "momentum_lookback": 15,
+      "momentum_thresh": 0.04
+    },
+    "metrics": {
+      "wr": 50.965250965250966,
+      "pf": 1.4744455974726622,
+      "dd": 7.4676771191589095,
+      "sharpe": 3.8286632571199966
+    },
+    "reason": "wr=51.0% pf=1.47 dd=7.5 sharpe=3.83"
+  },
+  {
+    "round": 2,
+    "strategy": "PulseCrack5",
+    "params": {
+      "dev_lookback": 5,
+      "deviation_pct": 0.035
+    },
+    "metrics": {
+      "wr": 53.88127853881278,
+      "pf": 0.9362592989342399,
+      "dd": 16.873071774830827,
+      "sharpe": -0.4443559146634297
+    },
+    "reason": "wr=53.9% pf=0.94 dd=16.9 sharpe=-0.44"
+  },
+  {
+    "round": 3,
+    "strategy": "EdgeDrop3",
+    "params": {
+      "reversal_lookback": 3,
+      "body_ratio": 0.41
+    },
+    "metrics": {
+      "wr": 40.0,
+      "pf": 0.821901895709326,
+      "dd": 21.332416182391338,
+      "sharpe": -1.0068060604006615
+    },
+    "reason": "wr=40.0% pf=0.82 dd=21.3 sharpe=-1.01"
+  },
+  {
+    "round": 3,
+    "strategy": "HelixSurge20",
+    "params": {
+      "lookback": 20,
+      "threshold": 1.5
+    },
+    "metrics": {
+      "wr": 58.730158730158735,
+      "pf": 1.480080288363928,
+      "dd": 4.61271660235576,
+      "sharpe": 2.8035225064890983
+    },
+    "reason": "wr=58.7% pf=1.48 dd=4.6 sharpe=2.80"
   }
 ]

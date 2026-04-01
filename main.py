@@ -10,10 +10,11 @@ import statistics
 import websockets
 from contextlib import asynccontextmanager
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from config import settings
 from binance_client import binance_client
@@ -277,6 +278,15 @@ async def get_strategies():
             sharpe=metrics.get("sharpe"),
         ))
     return statuses
+
+
+@app.get("/api/factor_library")
+async def get_factor_library():
+    """返回 factor_library.json 的內容"""
+    factor_file = Path(__file__).parent / "autoresearch" / "factor_library.json"
+    if factor_file.exists():
+        return JSONResponse(content=json.loads(factor_file.read_text()))
+    return JSONResponse(content=[])
 
 
 # ─── Live Strategy Matching ─────────────────────────────────────────────────

@@ -1,0 +1,12 @@
+{
+  "strategy": "FluxSwing9",
+  "researcher_wr": 63.8,
+  "qa_wr": 63.829787234042556,
+  "qa_pf": 2.125012688793792,
+  "qa_dd": 2.7155791225246357,
+  "qa_sharpe": 2.8466971461883963,
+  "qa_trades": 47,
+  "wr_error_pct": 0.029787234042558453,
+  "status": "\u2705 VERIFIED",
+  "verified_at": "2026-04-01T16:50:07.098469"
+}

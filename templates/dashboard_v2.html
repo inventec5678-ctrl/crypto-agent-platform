@@ -428,7 +428,16 @@
             </div>
         </div>
 
+        <!-- Tab Bar -->
+        <div style="background:var(--bg-secondary);border-bottom:1px solid var(--border-color);padding:0 24px;display:flex;gap:2px;">
+            <button onclick="switchTab('crypto')" id="tab-btn-crypto" style="background:#333;color:#fff;border:none;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;border-radius:6px 6px 0 0;">🪙 Crypto</button>
+            <button onclick="switchTab('twse')" id="tab-btn-twse" style="background:transparent;color:var(--text-muted);border:none;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;border-radius:6px 6px 0 0;">🏦 台股</button>
+            <button onclick="switchTab('strategies')" id="tab-btn-strategies" style="background:transparent;color:var(--text-muted);border:none;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;border-radius:6px 6px 0 0;">📊 策略庫</button>
+        </div>
+
         <div class="page">
+            <!-- Crypto Tab (default visible) -->
+            <div id="tab-crypto" class="tab-content">
 
             <!-- Market Sentiment -->
             <div class="section">
@@ -491,8 +500,8 @@
                 </div>
             </div>
 
-            <!-- Chart -->
-            <div class="section">
+            <!-- Chart (Crypto) -->
+            <div class="section" id="chart-crypto-section">
                 <div class="section-title" id="chart-section-title">比特幣 K 線</div>
                 <div class="chart-wrap">
                     <div class="chart-header">
@@ -583,9 +592,54 @@
 
                 </div>
             </div>
+            </div><!-- /tab-crypto (Market Sentiment + Consensus + Ranking + Chart + Anomaly) -->
+
+            <!-- TWSE Tab Content -->
+            <div id="tab-twse" class="tab-content" style="display:none;">
+                <div class="section">
+                    <div class="section-title">台股 K 線</div>
+                    <div class="chart-wrap">
+                        <div class="chart-header">
+                            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                                <select id="twse-stock-select-v2" onchange="onTWSEStockChange(this.value)" style="background:var(--bg-tertiary);border:1px solid var(--border-color);color:var(--text-primary);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--font-mono)">
+                                    <option value="2330">2330 台積電</option>
+                                    <option value="2317">2317 鴻海</option>
+                                    <option value="2454">2454 聯發科</option>
+                                    <option value="2891">2891 中信金</option>
+                                    <option value="2884">2884 玉山金</option>
+                                    <option value="2885">2885 元大金</option>
+                                    <option value="2618">2618 東畸</option>
+                                </select>
+                                <div style="position:relative">
+                                    <input id="twse-search-input-v2" type="text" placeholder="搜尋股票..." style="background:var(--bg-tertiary);border:1px solid var(--border-color);color:var(--text-primary);border-radius:6px;padding:3px 8px;font-size:11px;width:120px;font-family:var(--font-mono)">
+                                    <div id="twse-search-results-v2" style="display:none;position:absolute;top:100%;left:0;z-index:200;background:var(--bg-card);border:1px solid var(--border-color);border-radius:6px;min-width:180px;max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.4);margin-top:4px"></div>
+                                </div>
+                                <span id="twse-price-v2" class="chart-price">—</span>
+                                <span id="twse-change-v2" style="font-size:11px;margin-left:6px;font-family:var(--font-mono)">—</span>
+                                <span id="twse-volume-v2" style="font-size:10px;color:var(--text-muted);margin-left:6px"></span>
+                            </div>
+                            <div class="chart-tf">
+                                <button class="tf-btn active" data-tf="D" onclick="loadTWSEChartV2('D')">日</button>
+                                <button class="tf-btn" data-tf="W" onclick="loadTWSEChartV2('W')">週</button>
+                                <button class="tf-btn" data-tf="M" onclick="loadTWSEChartV2('M')">月</button>
+                            </div>
+                        </div>
+                        <div id="chart-container-twse" style="height:380px"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Strategy Library Tab -->
+            <div id="tab-strategies" class="tab-content" style="display:none;">
+                <div class="section">
+                    <div class="section-title">策略庫</div>
+                    <div id="strategy-list">
+                        <div class="loading">載入中...</div>
+                    </div>
+                </div>
+            </div>
 
         </div>
-    
 </div>
 
 <!-- Strategy Detail Modal -->
@@ -1131,8 +1185,11 @@ function loadStrategies() {
 
             // Update chart price
             if (btcPrice) {
-                document.getElementById('chart-price').textContent = fmtPrice(btcPrice);
-                document.getElementById('chart-price').className = 'chart-price';
+                var chartPriceEl = document.getElementById('chart-price');
+                if (chartPriceEl) {
+                    chartPriceEl.textContent = fmtPrice(btcPrice);
+                    chartPriceEl.className = 'chart-price';
+                }
             }
 
         })
@@ -1221,20 +1278,24 @@ function loadChartData(sym, tf) {
                         }
                     }
                 }
-                document.getElementById('chart-sym').textContent = stockName;
+                var chartSymEl = document.getElementById('chart-sym');
+                if (chartSymEl) chartSymEl.textContent = stockName;
             } else {
-                document.getElementById('chart-sym').textContent = sym + '/USDT';
+                var chartSymEl2 = document.getElementById('chart-sym');
+                if (chartSymEl2) chartSymEl2.textContent = sym + '/USDT';
             }
 
             var last = cdata[cdata.length - 1];
             if (last) {
                 var priceEl = document.getElementById('chart-price');
-                priceEl.textContent = fmtPrice(last.close);
-                priceEl.className = 'chart-price';
-                if (cdata.length > 1) {
-                    var prev = cdata[cdata.length - 2];
-                    if (prev) {
-                        priceEl.className = 'chart-price ' + (last.close >= prev.close ? 'up' : 'dn');
+                if (priceEl) {
+                    priceEl.textContent = fmtPrice(last.close);
+                    priceEl.className = 'chart-price';
+                    if (cdata.length > 1) {
+                        var prev = cdata[cdata.length - 2];
+                        if (prev) {
+                            priceEl.className = 'chart-price ' + (last.close >= prev.close ? 'up' : 'dn');
+                        }
                     }
                 }
                 var chgEl = document.getElementById('chart-change');
@@ -1248,6 +1309,110 @@ function loadChartData(sym, tf) {
         .catch(function(e) {
             console.error('chart error', e);
         });
+}
+
+// ── Tab Switching ──
+function switchTab(tab) {
+    // Hide all tab content
+    document.querySelectorAll('.tab-content').forEach(function(el) { el.style.display = 'none'; });
+    // Reset all tab buttons
+    document.querySelectorAll('#tab-bar button, [id^="tab-btn-"]').forEach(function(el) {
+        el.style.background = '';
+        el.style.color = 'var(--text-muted)';
+    });
+    // Show selected tab content
+    var tabEl = document.getElementById('tab-' + tab);
+    if (tabEl) tabEl.style.display = 'block';
+    // Highlight active tab button
+    var btnEl = document.getElementById('tab-btn-' + tab);
+    if (btnEl) { btnEl.style.background = '#333'; btnEl.style.color = '#fff'; }
+    // Trigger content load
+    if (tab === 'strategies') loadStrategyLibrary();
+    if (tab === 'twse') initTWSEChartV2();
+}
+
+// ── Strategy Library ──
+async function loadStrategyLibrary() {
+    try {
+        var resp = await fetch('/api/factor_library');
+        var strategies = await resp.json();
+        var container = document.getElementById('strategy-list');
+        if (!strategies || strategies.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px">尚無策略</p>';
+            return;
+        }
+        var html = '<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; padding:12px;">';
+        for (var i = 0; i < strategies.length; i++) {
+            var s = strategies[i];
+            var m = s.metrics || {};
+            var verified = s.qa_verified ? '✅ QA Verified' : '⚠️ Unverified';
+            var entryConditions = s.entry_conditions || [];
+            html += '<div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:16px;">';
+            html += '<h3 style="margin:0 0 8px 0; color:#fff; font-size:14px;">' + (s.factor_id || s.name || 'Unknown') + '</h3>';
+            html += '<p style="margin:0 0 4px 0; color:#888; font-size:13px;">' + (s.direction || 'LONG') + ' | ' + (s.timeframe || '1D') + '</p>';
+            html += '<div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin:12px 0;">';
+            html += '<div style="background:#0f0f1a; padding:8px; border-radius:4px;"><div style="color:#888; font-size:11px;">勝率</div><div style="color:#4ade80; font-size:18px; font-weight:bold;">' + (m.win_rate ? m.win_rate.toFixed(1) + '%' : 'N/A') + '</div></div>';
+            html += '<div style="background:#0f0f1a; padding:8px; border-radius:4px;"><div style="color:#888; font-size:11px;">盈虧比</div><div style="color:#4ade80; font-size:18px; font-weight:bold;">' + (m.profit_factor ? m.profit_factor.toFixed(2) : 'N/A') + '</div></div>';
+            html += '<div style="background:#0f0f1a; padding:8px; border-radius:4px;"><div style="color:#888; font-size:11px;">最大回撤</div><div style="color:#f87171; font-size:18px; font-weight:bold;">' + (m.max_drawdown ? m.max_drawdown.toFixed(1) + '%' : 'N/A') + '</div></div>';
+            html += '<div style="background:#0f0f1a; padding:8px; border-radius:4px;"><div style="color:#888; font-size:11px;">Sharpe</div><div style="color:#60a5fa; font-size:18px; font-weight:bold;">' + (m.sharpe_ratio ? m.sharpe_ratio.toFixed(2) : 'N/A') + '</div></div>';
+            html += '</div>';
+            html += '<p style="margin:0 0 4px 0; color:#888; font-size:12px;">' + verified + '</p>';
+            if (entryConditions.length > 0) {
+                html += '<details><summary style="color:#60a5fa; cursor:pointer; font-size:13px;">查看進場條件</summary>';
+                html += '<div style="margin-top:8px; padding:8px; background:#0f0f1a; border-radius:4px;">';
+                for (var j = 0; j < entryConditions.length; j++) {
+                    html += '<div style="color:#ccc; font-size:12px;">• ' + entryConditions[j] + '</div>';
+                }
+                html += '</div></details>';
+            }
+            html += '</div>';
+        }
+        html += '</div>';
+        container.innerHTML = html;
+    } catch (e) {
+        document.getElementById('strategy-list').innerHTML = '<p style="color:var(--accent-red);text-align:center;padding:40px">載入失敗: ' + e.message + '</p>';
+    }
+}
+
+// ── TWSE Chart V2 ──
+var twseChartV2 = null;
+var twseCandleSeriesV2 = null;
+function initTWSEChartV2() {
+    var container = document.getElementById('chart-container-twse');
+    if (!container) return;
+    if (twseChartV2) { twseChartV2.remove(); twseChartV2 = null; }
+    twseChartV2 = LightweightCharts.createChart(container, {
+        width: container.clientWidth, height: container.clientHeight,
+        layout: { background: { color: '#161B22' }, textColor: '#8B949E' },
+        grid: { vertLines: { color: '#1C2128' }, horzLines: { color: '#1C2128' } },
+        rightPriceScale: { borderColor: '#30363D' },
+        timeScale: { borderColor: '#30363D', timeVisible: true },
+    });
+    twseCandleSeriesV2 = twseChartV2.addCandlestickSeries({
+        upColor: '#3FB950', downColor: '#F85149',
+        borderUpColor: '#3FB950', borderDownColor: '#F85149',
+        wickUpColor: '#3FB950', wickDownColor: '#F85149',
+    });
+    loadTWSEChartV2('D');
+    window.addEventListener('resize', function() {
+        if (twseChartV2 && container) twseChartV2.applyOptions({ width: container.clientWidth });
+    });
+}
+
+function loadTWSEChartV2(tf) {
+    if (!twseCandleSeriesV2) return;
+    var stock = document.getElementById('twse-stock-select-v2');
+    var code = stock ? stock.value : '2330';
+    fetch(API_BASE + '/twse/klines/' + code + '?interval=' + tf + '&limit=300')
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function(data) {
+            if (!data || !data.length) return;
+            var cdata = data.map(function(d) {
+                return { time: d.time, open: parseFloat(d.open), high: parseFloat(d.high), low: parseFloat(d.low), close: parseFloat(d.close) };
+            });
+            twseCandleSeriesV2.setData(cdata);
+            twseChartV2.timeScale().fitContent();
+        }).catch(function(e) { console.error('TWSE chart error', e); });
 }
 
 // ── Init ──
@@ -1304,6 +1469,8 @@ document.addEventListener('DOMContentLoaded', function() {
     loadChartData('BTC', '4h');
     loadStrategies();
     loadAnomalies();
+    // Initialize tab system - show Crypto tab by default
+    switchTab('crypto');
 
     // Auto-refresh every 60s
     // Unified 60s refresh with countdown timer

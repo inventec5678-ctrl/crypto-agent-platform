@@ -1,0 +1,12 @@
+{
+  "strategy": "HelixTilt20",
+  "researcher_wr": 69.8,
+  "qa_wr": 69.76744186046511,
+  "qa_pf": 2.9705296756420667,
+  "qa_dd": 2.7155791225246038,
+  "qa_sharpe": 3.7690268565662204,
+  "qa_trades": 43,
+  "wr_error_pct": 0.032558139534884845,
+  "status": "\u2705 VERIFIED",
+  "verified_at": "2026-04-01T16:50:07.790920"
+}

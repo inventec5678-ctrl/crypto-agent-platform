@@ -6,3 +6,33 @@ df79ea1	60.1695	1.5429	5.34	2.8995	discard	round3: MABreakoutStrategy {'ma_perio
 4022b72	60.8696	0.8751	21.43	-0.6197	discard	rsi_reversal: rsi_period=7, rsi_oversold=30, vol_thresh=1.3235975795032615, TP=5%, SL=2%
 b8dd0dd	61.5385	1.8404	3.40	2.5065	discard	ma_breakout: ma_period=20, price_thresh=0.035152703225608414, vol_thresh=1.9104071656611228, TP=5%, SL=2%
 13c00d4	63.0137	2.1514	2.72	3.6978	keep	vol_breakout: vol_ratio>1.6604010098739508(vol_period=10), price_change>0.01636035207956837, TP=5%, SL=2%
+AgentStrategy_R1	57.843137	0.0	discard	momentum+volume: vol>1.46(p15) price>0.043(p15) ma>20 TP=4% SL=2%
+AgentStrategy_R2	64.044944	0.0	discard	ma_cross+volume+rsi: vol>1.65(p20) price>0.021(p15) ma>10 TP=3% SL=1%
+AgentStrategy_R3	31.380753	0.0	discard	ma_cross+rsi: vol>1.62(p25) price>0.014(p10) ma>10 TP=5% SL=3%
+AgentStrategy_R4	71.428571	0.0	keep	volume+momentum: vol>1.98(p10) price>0.03(p10) ma>20 TP=11% SL=2%
+AgentStrategy_R5	58.571429	0.0	discard	rsi+volume: vol>1.54(p20) price>0.048(p15) ma>20 TP=11% SL=1%
+AgentStrategy_R6	64.210526	0.0	discard	momentum+volume: vol>1.64(p25) price>0.012(p20) ma>10 TP=3% SL=4%
+AgentStrategy_R7	27.669903	0.0	discard	ma_cross+rsi: vol>1.46(p15) price>0.022(p20) ma>15 TP=11% SL=2%
+AgentStrategy_R8	66.153846	0.0	keep	volume+momentum: vol>1.69(p15) price>0.033(p10) ma>30 TP=11% SL=4%
+AgentStrategy_R9	61.428571	0.0	keep	rsi+volume: vol>1.78(p15) price>0.016(p5) ma>30 TP=3% SL=4%
+AgentStrategy_R10	59.701493	0.0	discard	ma_cross+volume+rsi: vol>1.49(p25) price>0.036(p10) ma>15 TP=5% SL=2%
+3a6d2b2	0.0000	0.0000	0.00	0.0000	discard	ArcBreak15: {'extremes_lookback': 15}
+ce1b8ff	33.3333	1.6170	0.33	0.4832	discard	FluxDrop12: {'reversal_lookback': 12, 'body_ratio': 0.54}
+1ff4602	54.2208	1.6074	8.18	5.0553	discard	RidgeFlow4: {'momentum_lookback': 4, 'momentum_thresh': 0.01}
+dd36d5a	50.9653	1.4744	7.47	3.8287	discard	NovaSwipe15: {'momentum_lookback': 15, 'momentum_thresh': 0.04}
+4909659	53.8813	0.9363	16.87	-0.4444	discard	PulseCrack5: {'dev_lookback': 5, 'deviation_pct': 0.035}
+d0e42b6	40.0000	0.8219	21.33	-1.0068	discard	EdgeDrop3: {'reversal_lookback': 3, 'body_ratio': 0.41}
+56fed1d	63.8298	2.1250	2.72	2.8467	keep	FluxSwing9: {'lookback': 9, 'threshold': 1.8}
+69ebb98	69.7674	2.9705	2.72	3.7690	keep	HelixTilt20: {'lookback': 20, 'threshold': 2.1}
+948a344	58.7302	1.4801	4.61	2.8035	discard	HelixSurge20: {'lookback': 20, 'threshold': 1.5}
+TalibRSI_RS7_T25_V1.85	61.904762	0.0	discard	talib_rsi_reversal: rsi_period=7, rsi_thresh=25, vol_mult=1.85
+PriceAction_L7_B0.51_V1.41	0.000000	0.0	discard	pure_price_action: lookback=7, body_thresh=0.51, vol_mult=1.41
+MixedIndicators_MA30_RSI21_35	24.626866	0.0	discard	mixed: ma_period=30, rsi_period=21, rsi_thresh=35
+VolProfile_MA50_DEV0.071	58.426966	0.0	discard	volume_profile: ma_period=50, dev_thresh=0.071
+TalibMACD_F8_S20_SIG11_V1.4	59.090909	0.0	discard	talib_macd: fast=8, slow=20, signal=11, vol_mult=1.4
+MixedIndicators_MA15_RSI21_30	27.184466	0.0	discard	mixed: ma_period=15, rsi_period=21, rsi_thresh=30
+TalibMACross_F8_S25_V1.77	59.259259	0.0	discard	talib_ma_cross: ma_fast=8, ma_slow=25, vol_mult=1.77
+VolBreakout_BB10_STD2.8_V1.91	66.666667	0.0	discard	volatility_breakout: bb_period=10, bb_std=2.8, vol_mult=1.91
+TalibMACD_F10_S20_SIG11_V1.78	63.013699	0.0	discard	talib_macd: fast=10, slow=20, signal=11, vol_mult=1.78
+CustomZscore_L10_Z2.2_V1.4	62.000000	0.0	discard	custom_zscore: lookback=10, z_thresh=2.2, vol_mult=1.4
+TalibMACD_F10_S20_SIG9_V1.87	67.391304	0.0	keep	talib_macd: fast=10, slow=20, signal=9, vol_mult=1.87

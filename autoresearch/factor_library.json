@@ -217,5 +217,45 @@
     "source": "auto_research",
     "status": "candidate",
     "notes": "Variant of EMA_Crossover_1D with tighter RSI filter (55 instead of 50 for long)"
+  },
+  {
+    "factor_id": "VolBreakoutStrategy_v1",
+    "name": "Volatility Breakout Strategy",
+    "symbol": "BTCUSDT",
+    "timeframe": "1D",
+    "direction": "LONG",
+    "entry_conditions": [
+      "vol_ratio = volume / MA(volume, 10)",
+      "vol_ratio > 1.66",
+      "price_change(10) > 0.016"
+    ],
+    "entry_logic": "vol_ratio > vol_mult AND price_change > price_filter",
+    "exit_conditions": [
+      "TP = 5.0%",
+      "SL = 2.0%",
+      "Max holding = 10 bars"
+    ],
+    "stop_loss_pct": 0.02,
+    "take_profit_pct": 0.05,
+    "max_holding_bars": 10,
+    "regime_filter": "none",
+    "parameters": {
+      "vol_period": 10,
+      "vol_mult": 1.6604010098739508,
+      "price_filter": 0.01636035207956837,
+      "tp_pct": 0.05,
+      "sl_pct": 0.02
+    },
+    "metrics": {
+      "win_rate": 63.0,
+      "profit_factor": 2.49,
+      "max_drawdown": 2.7,
+      "sharpe_ratio": 3.8,
+      "total_trades": 72
+    },
+    "verified": true,
+    "qa_verified": true,
+    "source": "autoresearch/research_log.md",
+    "added_at": "2026-04-01T16:11:30.529211"
   }
 ]

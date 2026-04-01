@@ -1,0 +1,12 @@
+{
+  "strategy": "Unknown",
+  "researcher_wr": 58.7,
+  "qa_wr": 0.0,
+  "qa_pf": 0.0,
+  "qa_dd": 0.0,
+  "qa_sharpe": 0.0,
+  "qa_trades": 0,
+  "wr_error_pct": 58.7,
+  "status": "\u274c FAIL",
+  "verified_at": "2026-04-01T16:48:49.362729"
+}

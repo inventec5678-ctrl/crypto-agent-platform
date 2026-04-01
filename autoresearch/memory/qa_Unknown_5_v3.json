@@ -1,0 +1,12 @@
+{
+  "strategy": "Unknown_5",
+  "researcher_wr": 66.2,
+  "qa_wr": 66.15384615384615,
+  "qa_pf": 2.9537702587044907,
+  "qa_dd": 2.704115571876762,
+  "qa_sharpe": 4.112002485431828,
+  "qa_trades": 65,
+  "wr_error_pct": 0.04615384615385665,
+  "status": "VERIFIED",
+  "verified_at": "2026-04-01T16:31:54.719198"
+}
