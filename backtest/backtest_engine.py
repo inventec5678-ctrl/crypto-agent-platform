@@ -363,9 +363,9 @@ class BacktestEngine:
         drawdown_pct = (drawdown / peak) * 100 if peak > 0 else 0
         return drawdown, drawdown_pct
     
-    def _execute_order(self, order: Order) -> Order:
+    def _execute_order(self, order: Order, market_data: Dict[str, pd.DataFrame]) -> Order:
         """執行訂單"""
-        symbol_data = self.data[order.symbol]
+        symbol_data = market_data[order.symbol]
         current_price = symbol_data['close'].iloc[-1]
         
         order.filled_price = current_price * (1 + order.slippage if order.side == PositionSide.LONG else 1 - order.slippage)
@@ -443,10 +443,10 @@ class BacktestEngine:
         
         self.position = None
     
-    def _update_equity(self, timestamp: datetime):
+    def _update_equity(self, timestamp: datetime, market_data: Dict[str, pd.DataFrame]):
         """更新權益曲線"""
         if self.position:
-            self.position.current_price = self.data[self.position.symbol]['close'].iloc[-1]
+            self.position.current_price = market_data[self.position.symbol]['close'].iloc[-1]
             if self.position.side == PositionSide.LONG:
                 self.position.unrealized_pnl = (
                     self.position.current_price - self.position.entry_price
@@ -533,7 +533,7 @@ class BacktestEngine:
                     quantity=max_qty,
                     slippage=self.config.get('slippage', 0.0001)
                 )
-                self._execute_order(order)
+                self._execute_order(order, market_data)
             
             elif signal == PositionSide.FLAT and self.position:
                 # 平倉
@@ -545,10 +545,10 @@ class BacktestEngine:
                     quantity=self.position.quantity,
                     slippage=self.config.get('slippage', 0.0001)
                 )
-                self._execute_order(order)
+                self._execute_order(order, market_data)
             
             # 更新權益曲線
-            self._update_equity(ts)
+            self._update_equity(ts, market_data)
         
         # 計算績效指標
         result = self._calculate_performance()
