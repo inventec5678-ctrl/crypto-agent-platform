@@ -366,5 +366,31 @@
     "source": "manual_research",
     "status": "pending_review",
     "logic_notes": "方向E：MACD柱子縮減 + 價格結構。MACD histogram由負值收斂→代表空頭動能耗盡，是潛在反轉信號。價格回測MA20支撐+MA20>MA50=技術結構確認。RSI>50過濾進場時機。結合了動量指標與價格結構的雙重確認，減少假突破。層次：MACD動能衰竭→價格測試支撐→均線排列確認→RSI過濾。"
+  },
+  {
+    "factor_id": "LONG_BreakoutHigh_v1",
+    "name": "LONG Breakout High",
+    "type": "breakout",
+    "entry": {
+      "long": {
+        "rsi_above_45": true,
+        "rsi_below_75": true,
+        "volume_spike_1.5x": true,
+        "regime_bull": true
+      },
+      "short": {}
+    },
+    "stop_loss": "5%",
+    "take_profit": "5%",
+    "max_holding": "15 bars",
+    "source": "auto_research",
+    "status": "verified",
+    "metrics": {
+      "win_rate": 72.22,
+      "profit_factor": 2.52,
+      "max_drawdown": 18.82,
+      "sharpe": 9.14
+    },
+    "timeframe": "1D"
   }
 ]

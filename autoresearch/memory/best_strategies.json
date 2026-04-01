@@ -129,5 +129,47 @@
     },
     "status": "VERIFIED",
     "verified_at": "2026-03-27T11:31:00"
+  },
+  {
+    "strategy_id": "LONG_BreakoutHigh_v1",
+    "strategy_name": "LONG Breakout High",
+    "focus_area": "突破型/動量型",
+    "round": 1,
+    "entry_description": "RSI 45-75 + 成交量放大 1.5x 確認突破 + 市場結構多頭過濾 (price > MA200)",
+    "params": {
+      "rsi_min": 45,
+      "rsi_max": 75,
+      "vol_mult": 1.5,
+      "take_profit_pct": 5.0,
+      "stop_loss_pct": 5.0,
+      "regime_filter": true
+    },
+    "backtest": {
+      "total_trades": 18,
+      "wins": 13,
+      "losses": 5,
+      "long_trades": 18,
+      "short_trades": 0,
+      "win_rate": 72.22,
+      "profit_factor": 2.52,
+      "max_drawdown": 18.82,
+      "sharpe": 9.14,
+      "total_return_pct": 43.86
+    },
+    "metrics": {
+      "win_rate": 72.22,
+      "profit_factor": 2.52,
+      "max_drawdown": 18.82,
+      "sharpe": 9.14
+    },
+    "target_checks": {
+      "win_rate_50": "PASS",
+      "profit_factor_2.0": "PASS",
+      "max_drawdown_30": "PASS",
+      "sharpe_1.5": "PASS"
+    },
+    "status": "VERIFIED",
+    "verified_at": "2026-04-01T08:35:00",
+    "agent_id": "researcher_subagent"
   }
 ]
