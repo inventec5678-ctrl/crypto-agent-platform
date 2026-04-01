@@ -834,6 +834,16 @@ function fmtPrice(n) {
     return '$' + fmt(n);
 }
 
+function copyPrice(btn, val) {
+    if (!val || val === '—' || val === 'null' || val === 'undefined') return;
+    navigator.clipboard.writeText(val.toString()).then(function() {
+        btn.classList.add('copied');
+        var orig = btn.textContent;
+        btn.textContent = '已複製';
+        setTimeout(function() { btn.classList.remove('copied'); btn.textContent = orig; }, 1500);
+    }).catch(function() {});
+}
+
 function fmtPct(n) {
     if (!n && n !== 0) return '—';
     return (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
@@ -1390,36 +1400,175 @@ function _renderModalConditions(s) {
 }
 
 function _doRenderModal(s) {
-    console.log('[DEBUG] _doRenderModal called for:', s.name, 'direction:', s.direction);
+    var dir = s.direction || 'LONG';
+    var badgeClass = dir === 'SHORT' ? 'short' : dir === 'LONG' ? 'long' : 'neutral';
+    var dirIcon = dir === 'SHORT' ? '🔴' : dir === 'LONG' ? '🟢' : '⚪';
+    var wr = s.win_rate || 0;
+    var pf = s.profit_factor || 0;
+    var dd = s.max_drawdown || 0;
+    var sharpe = s.sharpe || 0;
+    var matchPct = s.match_pct || 0;
+    var matched = s.matched || [];
+    var conditions = [];
+    if (s.matched_conditions && s.total_conditions) {
+        conditions.push(s.matched_conditions + '/' + s.total_conditions + ' 條件滿足');
+    }
+    if (s.signal) conditions.push('信號: ' + s.signal);
+    if (s.confidence) conditions.push('信心: ' + s.confidence);
 
-    // 測試：直接強制開 Modal
-    var modal = document.getElementById('strategy-modal');
-    if (modal) {
-        modal.classList.add('open');
-    }
-    var title = document.getElementById('modal-title');
-    if (title) {
-        title.textContent = s.name || '策略詳情';
-    }
     var body = document.getElementById('modal-body');
-    if (body) {
-        body.innerHTML = '<div style="padding:20px;background:#1C2128;border-radius:8px;margin:16px"><h3 style="color:#58A6FF;margin-bottom:12px">策略概覽</h3><p><b>勝率：</b>' + (s.win_rate||0).toFixed(1) + '%</p><p><b>盈虧比：</b>' + (s.profit_factor||0).toFixed(2) + '</p><p><b>最大回撤：</b>' + (s.max_drawdown||0).toFixed(1) + '%</p><p><b>Sharpe：</b>' + (s.sharpe||0).toFixed(2) + '</p><p><b>方向：</b>' + (s.direction||'neutral') + '</p><p><b>進場價：</b>' + (s.entry_price||'—') + '</p></div>';
+    body.innerHTML = '\
+        <div class="modal-section">\
+            <div class="modal-section-title">策略概覽</div>\
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">\
+                <span class="rank-badge ' + badgeClass + '" style="font-size:13px;padding:4px 12px">' + dirIcon + ' ' + dir + '</span>\
+                <span style="font-size:13px;color:var(--text-secondary)">' + (s.timeframe || '') + '</span>\
+                <span style="margin-left:auto;font-size:12px;color:var(--text-muted)">信心度 ' + matchPct + '%</span>\
+            </div>\
+            <div class="modal-metrics">\
+                <div class="modal-metric"><div class="modal-metric-label">勝率</div><div class="modal-metric-value ' + (wr>=60?'good':wr>=40?'warn':'bad') + '">' + wr.toFixed(1) + '%</div></div>\
+                <div class="modal-metric"><div class="modal-metric-label">盈虧比</div><div class="modal-metric-value ' + (pf>=3?'good':pf>=2?'warn':'bad') + '">' + pf.toFixed(2) + '</div></div>\
+                <div class="modal-metric"><div class="modal-metric-label">最大回撤</div><div class="modal-metric-value ' + (dd<=10?'good':dd<=20?'warn':'bad') + '">' + dd.toFixed(1) + '%</div></div>\
+                <div class="modal-metric"><div class="modal-metric-label">Sharpe</div><div class="modal-metric-value ' + (sharpe>=2?'good':sharpe>=1?'warn':'bad') + '">' + sharpe.toFixed(2) + '</div></div>\
+            </div>\
+        </div>\
+        <div class="modal-section">\
+            <div class="modal-section-title">進場 / 止盈 / 止損</div>\
+            <div class="modal-prices">\
+                <div class="modal-price-card"><div class="modal-price-label">進場價</div><div class="modal-price-value entry">' + fmtPrice(s.entry_price) + '</div><button class="copy-btn" onclick="copyPrice(this, \'' + s.entry_price + '\')">複製</button></div>\
+                <div class="modal-price-card"><div class="modal-price-label">止盈</div><div class="modal-price-value tp">' + fmtPrice(s.take_profit) + '</div><button class="copy-btn" onclick="copyPrice(this, \'' + s.take_profit + '\')">複製</button></div>\
+                <div class="modal-price-card"><div class="modal-price-label">止損</div><div class="modal-price-value sl">' + fmtPrice(s.stop_loss) + '</div><button class="copy-btn" onclick="copyPrice(this, \'' + s.stop_loss + '\')">複製</button></div>\
+            </div>\
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">\
+                <div class="modal-price-card"><div class="modal-price-label">TP%</div><div class="modal-price-value tp">' + (s.tp_pct ? s.tp_pct.toFixed(1) + '%' : '—') + '</div></div>\
+                <div class="modal-price-card"><div class="modal-price-label">SL%</div><div class="modal-price-value sl">' + (s.sl_pct ? s.sl_pct.toFixed(1) + '%' : '—') + '</div></div>\
+            </div>\
+        </div>\
+        ' + (conditions.length ? '\
+        <div class="modal-section">\
+            <div class="modal-section-title">觸發條件</div>\
+            <div class="modal-tags">' + conditions.map(function(c){ return '<span class="modal-tag">' + c + '</span>'; }).join('') + '</div>\
+        </div>' : '') + '\
+        ' + (s.reason ? '\
+        <div class="modal-section">\
+            <div class="modal-section-title">原因</div>\
+            <div class="modal-reason">' + s.reason + '</div>\
+        </div>' : '') + '\
+        ' + (s.tp_note ? '\
+        <div class="modal-section">\
+            <div class="modal-section-title">止盈備註</div>\
+            <div style="font-size:12px;color:var(--text-secondary);padding:8px;background:var(--bg-tertiary);border-radius:6px">' + s.tp_note + '</div>\
+        </div>' : '') + '\
+        <div class="modal-section">\
+            <div class="modal-section-title">圖表疊加</div>\
+            <div class="modal-chart-btns">\
+                <button class="modal-chart-btn" onclick="togglePriceLine(\'entry\')">📍 進場線</button>\
+                <button class="modal-chart-btn" onclick="togglePriceLine(\'tp\')">🎯 止盈線</button>\
+                <button class="modal-chart-btn" onclick="togglePriceLine(\'sl\')">🛡 止損線</button>\
+                <button class="modal-chart-btn" onclick="togglePriceLine(\'ma\')">📈 MA</button>\
+                <button class="modal-chart-btn" onclick="togglePriceLine(\'rsi\')">📊 RSI</button>\
+                <button class="modal-chart-btn" onclick="clearPriceLines()">清除</button>\
+            </div>\
+        </div>\
+    ';
+
+    // Append strategy parameters section
+    var params = s.parameters || {};
+    if (Object.keys(params).length > 0) {
+        var paramsHtml = '<div class="modal-section">';
+        paramsHtml += '<div class="modal-section-title">策略參數</div>';
+        paramsHtml += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">';
+        for (var key in params) {
+            paramsHtml += '<div style="background:rgba(50,50,50,0.3);padding:6px 8px;border-radius:4px;font-size:12px">';
+            paramsHtml += '<span style="color:#8B949E">' + key + ':</span> ';
+            paramsHtml += '<span style="color:#fff;font-weight:600">' + params[key] + '</span>';
+            paramsHtml += '</div>';
+        }
+        paramsHtml += '</div></div>';
+        body.innerHTML += paramsHtml;
     }
 
-    // 如果有 entry_conditions，顯示
-    if (body && (s.entry_conditions || s.conditions)) {
-        var conds = s.entry_conditions || s.conditions;
-        var ec = Array.isArray(conds) ? conds : [conds];
-        var ecHtml = '<div style="margin:16px"><h4 style="color:#8B949E;margin-bottom:8px">進場條件</h4>';
-        ec.forEach(function(c) {
-            ecHtml += '<div style="padding:6px 8px;background:#21262D;margin-bottom:4px;border-radius:4px;color:#E6EDF3;font-size:12px">⚪ ' + c + '</div>';
+    // Build entry conditions from params.long / params.short
+    var entryConditions = [];
+    var p = s.params || s.parameters || {};
+    var dir = (s.direction || 'LONG').toUpperCase();
+    var condObj = dir === 'SHORT' ? (p.short || p) : (p.long || p);
+    if (condObj && typeof condObj === 'object') {
+        for (var ck in condObj) {
+            if (condObj[ck] === true) {
+                var readable = ck.replace(/_/g, ' ').replace(/\b\w/g, function(l){ return l.toUpperCase(); });
+                entryConditions.push(readable);
+            }
+        }
+    }
+    if (entryConditions.length === 0) {
+        var fallback = s.entry_conditions || s.conditions || [];
+        if (typeof fallback === 'string') fallback = [fallback];
+        if (Array.isArray(fallback) && fallback.length > 0) {
+            entryConditions = fallback;
+        }
+    }
+    if (entryConditions.length === 0) {
+        var ec = s.entry_conditions;
+        if (typeof ec === 'string') ec = [ec];
+        if (Array.isArray(ec) && ec.length > 0) {
+            entryConditions = ec;
+        }
+    }
+    if (entryConditions.length === 0 && s.signal) {
+        var sig = s.signal;
+        if (typeof sig === 'string' && sig.length > 0) {
+            entryConditions = [sig];
+        }
+    }
+    if (entryConditions.length > 0) {
+        var ind = window._currentIndicators || {};
+        var rsi = ind.rsi || 50;
+        var macd_bull = ind.macd_bull || false;
+        var price_above_ma20 = ind.price_above_ma20 || false;
+        var price_above_ma50 = ind.price_above_ma50 || false;
+        var vol_ratio = ind.vol_ratio || 1;
+        var momentum = ind.momentum_7d || 0;
+        var evalCondition = function(cond) {
+            if (!cond) return false;
+            var lower = cond.toLowerCase();
+            if (lower.includes('rsi') && lower.includes('<')) {
+                var match = cond.match(/<?(\d+)/);
+                if (match) return rsi < parseFloat(match[1]);
+            }
+            if (lower.includes('rsi') && lower.includes('>')) {
+                var match = cond.match(/>?(\d+)/);
+                if (match) return rsi > parseFloat(match[1]);
+            }
+            if (lower.includes('ma20') && lower.includes('above')) return price_above_ma20;
+            if (lower.includes('ma50') && lower.includes('above')) return price_above_ma50;
+            if (lower.includes('vol') && (lower.includes('>') || lower.includes('high') || lower.includes('up'))) return vol_ratio > 1.5;
+            if (lower.includes('vol') && lower.includes('<')) return vol_ratio < 0.5;
+            if (lower.includes('macd') && lower.includes('bull')) return macd_bull;
+            if (lower.includes('momentum') && lower.includes('>')) return momentum > 0;
+            if (lower.includes('momentum') && lower.includes('<')) return momentum < 0;
+            return false;
+        };
+        var condHtml = '<div class="modal-section">';
+        condHtml += '<div class="modal-section-title">進場條件</div>';
+        entryConditions.forEach(function(cond) {
+            var satisfied = evalCondition(cond);
+            var color = satisfied ? '#3FB950' : '#555';
+            var bg = satisfied ? 'rgba(63,185,80,0.1)' : 'rgba(50,50,50,0.3)';
+            condHtml += '<div class="cond-item" style="background:' + bg + '">';
+            condHtml += '<span style="color:' + color + ';font-size:16px">' + (satisfied ? '✅' : '⚪') + '</span>';
+            condHtml += '<span style="color:' + (satisfied ? '#3FB950' : '#8B949E') + ';font-size:13px">' + cond + '</span>';
+            condHtml += '</div>';
         });
-        ecHtml += '</div>';
-        body.innerHTML += ecHtml;
+        condHtml += '</div>';
+        body.innerHTML += condHtml;
     }
 
-    window._currentStrategy = s;
     window._activeModalStrategy = s;
+    window._currentStrategy = s;
+    clearPriceLines();
+    document.getElementById('modal-title').textContent = s.name || '策略詳情';
+    document.getElementById('strategy-modal').classList.add('open');
 }
 
 function openStrategyModalById(id) {
