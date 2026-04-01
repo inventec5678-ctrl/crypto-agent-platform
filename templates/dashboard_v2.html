@@ -428,7 +428,7 @@
     <!-- Main -->
     
         <div class="topbar">
-            <div class="topbar-title">📈 加密貨幣量化交易平台</div>
+            <div class="topbar-title" id="topbar-title">📈 加密貨幣量化交易平台</div>
             <div class="topbar-right">
                 <div class="update-badge loading" id="update-badge">
                     <span class="dot"></span>
@@ -885,6 +885,12 @@ function switchMarket(market) {
     }
 
     currentMarket = market;
+
+    // 更新頁面抬頭標題
+    var titleEl = document.getElementById('topbar-title');
+    if (titleEl) {
+        titleEl.textContent = market === 'TWSE' ? '📈 台股量化交易平台' : '📈 加密貨幣量化交易平台';
+    }
     document.getElementById('btn-crypto').classList.toggle('active', market === 'CRYPTO');
     document.getElementById('btn-twse').classList.toggle('active', market === 'TWSE');
     document.getElementById('crypto-selector').style.display = market === 'CRYPTO' ? 'flex' : 'none';
@@ -900,12 +906,34 @@ function switchMarket(market) {
         });
         loadTWSEQuote(currentTWSEStock);
         loadTWSEChart(currentTWSEStock, twseTf);
+        // Clear ranking table for TWSE mode - no crypto strategies should show
+        renderRankingTable([]);
+        // Also clear consensus and sentiment since they're crypto-specific
+        var consBody = document.getElementById('consensus-body');
+        if (consBody) consBody.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:13px">台股模式，暫無策略資料</div>';
+        // Reset sentiment chips
+        var sentimentBar = document.getElementById('sentiment-bar');
+        if (sentimentBar) {
+            sentimentBar.querySelectorAll('.sentiment-chip').forEach(function(chip) {
+                chip.className = 'sentiment-chip neutral';
+            });
+        }
+        document.getElementById('sc-rsi-val').textContent = '—';
+        document.getElementById('sc-rsi4h-val').textContent = '—';
+        document.getElementById('sc-ma20-val').textContent = '—';
+        document.getElementById('sc-ma50-val').textContent = '—';
+        document.getElementById('sc-ma200-val').textContent = '—';
+        document.getElementById('sc-regime-val').textContent = '—';
+        document.getElementById('sc-momentum-val').textContent = '—';
+        document.getElementById('sc-cross-val').textContent = '—';
     } else if (market === 'CRYPTO') {
         document.querySelectorAll('#crypto-tf-buttons .tf-btn').forEach(function(b) {
             b.classList.toggle('active', b.dataset.tf === currentTF);
         });
         initChart();
         loadChartData(currentSym, currentTF);
+        // Reload crypto strategies when switching back
+        loadStrategies();
     }
 }
 
@@ -1408,9 +1436,13 @@ function openStrategyModalById(id) {
             }
         }
     }
-    if (s) {
-        _doRenderModal(s);
-    }
+    if (!s) { console.error('Strategy not found:', id); return; }
+    window._currentStrategy = s;
+    var body = document.getElementById('modal-body');
+    if (body) body.innerHTML = '<div style="padding:20px">載入中...</div>';
+    document.getElementById('modal-title').textContent = s.name || '策略詳情';
+    document.getElementById('strategy-modal').classList.add('open');
+    _doRenderModal(s);
 }
 
 function closeStrategyModal() {
