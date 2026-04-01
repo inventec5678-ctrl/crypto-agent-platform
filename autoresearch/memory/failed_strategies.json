@@ -1,818 +1,96 @@
 [
   {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "PinBar_v1",
-    "name": "PinBar_v1",
-    "problem": "未達標 (WR=21.9%, PF=1.36, DD=136.2%)",
-    "lesson": "嘗試新策略: VolumeOnly_PinBar"
-  },
-  {
-    "id": "WickRatio_v1",
-    "name": "WickRatio_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.42, DD=132.9%)",
-    "lesson": "嘗試新策略: VolumeOnly_WickRatio"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "ThreeWhiteSoldiers_v1",
-    "name": "ThreeWhiteSoldiers_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_ThreeWhiteSoldiers"
-  },
-  {
-    "id": "PinBar_v1",
-    "name": "PinBar_v1",
-    "problem": "未達標 (WR=21.9%, PF=1.36, DD=136.2%)",
-    "lesson": "嘗試新策略: VolumeOnly_PinBar"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "VolatilityCrisisBuy_v1",
-    "name": "VolatilityCrisisBuy_v1",
-    "problem": "未達標 (WR=16.7%, PF=1.04, DD=104.4%)",
-    "lesson": "嘗試新策略: VolatilityCrisis"
-  },
-  {
-    "id": "PinBar_v1",
-    "name": "PinBar_v1",
-    "problem": "未達標 (WR=21.9%, PF=1.36, DD=136.2%)",
-    "lesson": "嘗試新策略: VolumeOnly_PinBar"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "ThreeWhiteSoldiers_v1",
-    "name": "ThreeWhiteSoldiers_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_ThreeWhiteSoldiers"
-  },
-  {
-    "id": "VolumeSpike_v1",
-    "name": "VolumeSpike_v1",
-    "problem": "未達標 (WR=22.4%, PF=1.49, DD=116.8%)",
-    "lesson": "嘗試新策略: VolumeOnly_VolumeSpike"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "TrendVolumeBreakout_v1",
-    "name": "TrendVolumeBreakout_v1",
-    "problem": "未達標 (WR=30.4%, PF=2.98, DD=21.1%)",
-    "lesson": "嘗試新策略: TrendVolume"
-  },
-  {
-    "id": "PinBar_v1",
-    "name": "PinBar_v1",
-    "problem": "未達標 (WR=21.9%, PF=1.36, DD=136.2%)",
-    "lesson": "嘗試新策略: VolumeOnly_PinBar"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "ThreeWhiteSoldiers_v1",
-    "name": "ThreeWhiteSoldiers_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_ThreeWhiteSoldiers"
-  },
-  {
-    "id": "Engulfing_v1",
-    "name": "Engulfing_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_Engulfing"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "PinBar_v1",
-    "name": "PinBar_v1",
-    "problem": "未達標 (WR=21.9%, PF=1.36, DD=136.2%)",
-    "lesson": "嘗試新策略: VolumeOnly_PinBar"
-  },
-  {
-    "id": "VolumeCandleBody_v1",
-    "name": "VolumeCandleBody_v1",
-    "problem": "未達標 (WR=22.2%, PF=1.43, DD=133.7%)",
-    "lesson": "嘗試新策略: VolumeOnly_CandleBody"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "MondayPump_v1",
-    "name": "MondayPump_v1",
-    "problem": "未達標 (WR=21.2%, PF=1.43, DD=104.4%)",
-    "lesson": "嘗試新策略: MondayEffect"
-  },
-  {
-    "id": "WickRatio_v1",
-    "name": "WickRatio_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.42, DD=132.9%)",
-    "lesson": "嘗試新策略: VolumeOnly_WickRatio"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "TrendVolumeBreakout_v1",
-    "name": "TrendVolumeBreakout_v1",
-    "problem": "未達標 (WR=30.4%, PF=2.98, DD=21.1%)",
-    "lesson": "嘗試新策略: TrendVolume"
-  },
-  {
-    "id": "ThreeWhiteSoldiers_v1",
-    "name": "ThreeWhiteSoldiers_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_ThreeWhiteSoldiers"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "WeekendAccumulation_v1",
-    "name": "WeekendAccumulation_v1",
-    "problem": "未達標 (WR=21.0%, PF=1.45, DD=92.4%)",
-    "lesson": "嘗試新策略: WeekendEffect"
-  },
-  {
-    "id": "ThreeWhiteSoldiers_v1",
-    "name": "ThreeWhiteSoldiers_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_ThreeWhiteSoldiers"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "PinBar_v1",
-    "name": "PinBar_v1",
-    "problem": "未達標 (WR=21.9%, PF=1.36, DD=136.2%)",
-    "lesson": "嘗試新策略: VolumeOnly_PinBar"
-  },
-  {
-    "id": "WickRatio_v1",
-    "name": "WickRatio_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.42, DD=132.9%)",
-    "lesson": "嘗試新策略: VolumeOnly_WickRatio"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "Combo_TrendVolRSI_v1",
-    "name": "Combo_TrendVolRSI_v1",
-    "problem": "未達標 (WR=26.2%, PF=1.30, DD=79.4%)",
-    "lesson": "嘗試新策略: Combo_TrendVolRSI"
-  },
-  {
-    "id": "VolumeSpike_v1",
-    "name": "VolumeSpike_v1",
-    "problem": "未達標 (WR=22.4%, PF=1.49, DD=116.8%)",
-    "lesson": "嘗試新策略: VolumeOnly_VolumeSpike"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "Engulfing_v1",
-    "name": "Engulfing_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_Engulfing"
-  },
-  {
-    "id": "Engulfing_v1",
-    "name": "Engulfing_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_Engulfing"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "VolatilityCrisisBuy_v1",
-    "name": "VolatilityCrisisBuy_v1",
-    "problem": "未達標 (WR=16.7%, PF=1.04, DD=104.4%)",
-    "lesson": "嘗試新策略: VolatilityCrisis"
-  },
-  {
-    "id": "VolumeSpike_v1",
-    "name": "VolumeSpike_v1",
-    "problem": "未達標 (WR=22.4%, PF=1.49, DD=116.8%)",
-    "lesson": "嘗試新策略: VolumeOnly_VolumeSpike"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "ThreeWhiteSoldiers_v1",
-    "name": "ThreeWhiteSoldiers_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_ThreeWhiteSoldiers"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "TrendVolumeBreakout_v1",
-    "name": "TrendVolumeBreakout_v1",
-    "problem": "未達標 (WR=30.4%, PF=2.98, DD=21.1%)",
-    "lesson": "嘗試新策略: TrendVolume"
-  },
-  {
-    "id": "VolumeCandleBody_v1",
-    "name": "VolumeCandleBody_v1",
-    "problem": "未達標 (WR=22.2%, PF=1.43, DD=133.7%)",
-    "lesson": "嘗試新策略: VolumeOnly_CandleBody"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "Engulfing_v1",
-    "name": "Engulfing_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_Engulfing"
-  },
-  {
-    "id": "WickRatio_v1",
-    "name": "WickRatio_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.42, DD=132.9%)",
-    "lesson": "嘗試新策略: VolumeOnly_WickRatio"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "VolatilityCrisisBuy_v1",
-    "name": "VolatilityCrisisBuy_v1",
-    "problem": "未達標 (WR=16.7%, PF=1.04, DD=104.4%)",
-    "lesson": "嘗試新策略: VolatilityCrisis"
-  },
-  {
-    "id": "ThreeWhiteSoldiers_v1",
-    "name": "ThreeWhiteSoldiers_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_ThreeWhiteSoldiers"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "BullMarketRSI_v1",
-    "name": "BullMarketRSI_v1",
-    "problem": "未達標 (WR=26.5%, PF=1.00, DD=79.4%)",
-    "lesson": "嘗試新策略: BullMarketRSI"
-  },
-  {
-    "id": "Engulfing_v1",
-    "name": "Engulfing_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_Engulfing"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "MondayPump_v1",
-    "name": "MondayPump_v1",
-    "problem": "未達標 (WR=21.2%, PF=1.43, DD=104.4%)",
-    "lesson": "嘗試新策略: MondayEffect"
-  },
-  {
-    "id": "Engulfing_v1",
-    "name": "Engulfing_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_Engulfing"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "RegimeFilteredRSI_v1",
-    "name": "RegimeFilteredRSI_v1",
-    "problem": "未達標 (WR=26.5%, PF=1.00, DD=79.4%)",
-    "lesson": "嘗試新策略: RegimeFilteredRSI"
-  },
-  {
-    "id": "Engulfing_v1",
-    "name": "Engulfing_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_Engulfing"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "ThreeWhiteSoldiers_v1",
-    "name": "ThreeWhiteSoldiers_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_ThreeWhiteSoldiers"
-  },
-  {
-    "id": "VolumeCandleBody_v1",
-    "name": "VolumeCandleBody_v1",
-    "problem": "未達標 (WR=22.2%, PF=1.43, DD=133.7%)",
-    "lesson": "嘗試新策略: VolumeOnly_CandleBody"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "VolumeSpike_v1",
-    "name": "VolumeSpike_v1",
-    "problem": "未達標 (WR=22.4%, PF=1.49, DD=116.8%)",
-    "lesson": "嘗試新策略: VolumeOnly_VolumeSpike"
-  },
-  {
-    "id": "VolumeSpike_v1",
-    "name": "VolumeSpike_v1",
-    "problem": "未達標 (WR=22.4%, PF=1.49, DD=116.8%)",
-    "lesson": "嘗試新策略: VolumeOnly_VolumeSpike"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "Combo_TrendVolRSI_v1",
-    "name": "Combo_TrendVolRSI_v1",
-    "problem": "未達標 (WR=26.2%, PF=1.30, DD=79.4%)",
-    "lesson": "嘗試新策略: Combo_TrendVolRSI"
-  },
-  {
-    "id": "PinBar_v1",
-    "name": "PinBar_v1",
-    "problem": "未達標 (WR=21.9%, PF=1.36, DD=136.2%)",
-    "lesson": "嘗試新策略: VolumeOnly_PinBar"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "BullMarketRSI_v1",
-    "name": "BullMarketRSI_v1",
-    "problem": "未達標 (WR=26.5%, PF=1.00, DD=79.4%)",
-    "lesson": "嘗試新策略: BullMarketRSI"
-  },
-  {
-    "id": "Engulfing_v1",
-    "name": "Engulfing_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_Engulfing"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "WickRatio_v1",
-    "name": "WickRatio_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.42, DD=132.9%)",
-    "lesson": "嘗試新策略: VolumeOnly_WickRatio"
-  },
-  {
-    "id": "Engulfing_v1",
-    "name": "Engulfing_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_Engulfing"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "Combo_TrendVolRSI_v1",
-    "name": "Combo_TrendVolRSI_v1",
-    "problem": "未達標 (WR=26.2%, PF=1.30, DD=79.4%)",
-    "lesson": "嘗試新策略: Combo_TrendVolRSI"
-  },
-  {
-    "id": "ThreeWhiteSoldiers_v1",
-    "name": "ThreeWhiteSoldiers_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_ThreeWhiteSoldiers"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "RegimeFilteredRSI_v1",
-    "name": "RegimeFilteredRSI_v1",
-    "problem": "未達標 (WR=26.5%, PF=1.00, DD=79.4%)",
-    "lesson": "嘗試新策略: RegimeFilteredRSI"
-  },
-  {
-    "id": "Engulfing_v1",
-    "name": "Engulfing_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_Engulfing"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "TrendVolumeBreakout_v1",
-    "name": "TrendVolumeBreakout_v1",
-    "problem": "未達標 (WR=30.4%, PF=2.98, DD=21.1%)",
-    "lesson": "嘗試新策略: TrendVolume"
-  },
-  {
-    "id": "PinBar_v1",
-    "name": "PinBar_v1",
-    "problem": "未達標 (WR=21.9%, PF=1.36, DD=136.2%)",
-    "lesson": "嘗試新策略: VolumeOnly_PinBar"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "HighLowBreakout_v1",
-    "name": "HighLowBreakout_v1",
-    "problem": "未達標 (WR=28.0%, PF=3.53, DD=5.8%)",
-    "lesson": "嘗試新策略: HighLow"
-  },
-  {
-    "id": "PinBar_v1",
-    "name": "PinBar_v1",
-    "problem": "未達標 (WR=21.9%, PF=1.36, DD=136.2%)",
-    "lesson": "嘗試新策略: VolumeOnly_PinBar"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "VolumeSpike_v1",
-    "name": "VolumeSpike_v1",
-    "problem": "未達標 (WR=22.4%, PF=1.49, DD=116.8%)",
-    "lesson": "嘗試新策略: VolumeOnly_VolumeSpike"
-  },
-  {
-    "id": "WickRatio_v1",
-    "name": "WickRatio_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.42, DD=132.9%)",
-    "lesson": "嘗試新策略: VolumeOnly_WickRatio"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "WickRatio_v1",
-    "name": "WickRatio_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.42, DD=132.9%)",
-    "lesson": "嘗試新策略: VolumeOnly_WickRatio"
-  },
-  {
-    "id": "WickRatio_v1",
-    "name": "WickRatio_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.42, DD=132.9%)",
-    "lesson": "嘗試新策略: VolumeOnly_WickRatio"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "RSIReversal_v1",
-    "name": "RSIReversal_v1",
-    "problem": "未達標 (WR=26.5%, PF=1.00, DD=79.4%)",
-    "lesson": "嘗試新策略: RSI"
-  },
-  {
-    "id": "VolumeSpike_v1",
-    "name": "VolumeSpike_v1",
-    "problem": "未達標 (WR=22.4%, PF=1.49, DD=116.8%)",
-    "lesson": "嘗試新策略: VolumeOnly_VolumeSpike"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "TrendVolumeBreakout_v1",
-    "name": "TrendVolumeBreakout_v1",
-    "problem": "未達標 (WR=30.4%, PF=2.98, DD=21.1%)",
-    "lesson": "嘗試新策略: TrendVolume"
-  },
-  {
-    "id": "ThreeWhiteSoldiers_v1",
-    "name": "ThreeWhiteSoldiers_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_ThreeWhiteSoldiers"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "PinBar_v1",
-    "name": "PinBar_v1",
-    "problem": "未達標 (WR=21.9%, PF=1.36, DD=136.2%)",
-    "lesson": "嘗試新策略: VolumeOnly_PinBar"
-  },
-  {
-    "id": "VolumeCandleBody_v1",
-    "name": "VolumeCandleBody_v1",
-    "problem": "未達標 (WR=22.2%, PF=1.43, DD=133.7%)",
-    "lesson": "嘗試新策略: VolumeOnly_CandleBody"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "ThreeWhiteSoldiers_v1",
-    "name": "ThreeWhiteSoldiers_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_ThreeWhiteSoldiers"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "TrendVolumeBreakout_v1",
-    "name": "TrendVolumeBreakout_v1",
-    "problem": "未達標 (WR=30.4%, PF=2.98, DD=21.1%)",
-    "lesson": "嘗試新策略: TrendVolume"
-  },
-  {
-    "id": "WickRatio_v1",
-    "name": "WickRatio_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.42, DD=132.9%)",
-    "lesson": "嘗試新策略: VolumeOnly_WickRatio"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "PinBar_v1",
-    "name": "PinBar_v1",
-    "problem": "未達標 (WR=21.9%, PF=1.36, DD=136.2%)",
-    "lesson": "嘗試新策略: VolumeOnly_PinBar"
-  },
-  {
-    "id": "VolumeSpike_v1",
-    "name": "VolumeSpike_v1",
-    "problem": "未達標 (WR=22.4%, PF=1.49, DD=116.8%)",
-    "lesson": "嘗試新策略: VolumeOnly_VolumeSpike"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "WickRatio_v1",
-    "name": "WickRatio_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.42, DD=132.9%)",
-    "lesson": "嘗試新策略: VolumeOnly_WickRatio"
-  },
-  {
-    "id": "Engulfing_v1",
-    "name": "Engulfing_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_Engulfing"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "PinBar_v1",
-    "name": "PinBar_v1",
-    "problem": "未達標 (WR=21.9%, PF=1.36, DD=136.2%)",
-    "lesson": "嘗試新策略: VolumeOnly_PinBar"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "WeekendAccumulation_v1",
-    "name": "WeekendAccumulation_v1",
-    "problem": "未達標 (WR=21.0%, PF=1.45, DD=92.4%)",
-    "lesson": "嘗試新策略: WeekendEffect"
-  },
-  {
-    "id": "VolumeCandleBody_v1",
-    "name": "VolumeCandleBody_v1",
-    "problem": "未達標 (WR=22.2%, PF=1.43, DD=133.7%)",
-    "lesson": "嘗試新策略: VolumeOnly_CandleBody"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
-  },
-  {
-    "id": "VolumeSpike_v1",
-    "name": "VolumeSpike_v1",
-    "problem": "未達標 (WR=22.4%, PF=1.49, DD=116.8%)",
-    "lesson": "嘗試新策略: VolumeOnly_VolumeSpike"
-  },
-  {
-    "id": "VolumeCandleBody_v1",
-    "name": "VolumeCandleBody_v1",
-    "problem": "未達標 (WR=22.2%, PF=1.43, DD=133.7%)",
-    "lesson": "嘗試新策略: VolumeOnly_CandleBody"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "PinBar_v1",
-    "name": "PinBar_v1",
-    "problem": "未達標 (WR=21.9%, PF=1.36, DD=136.2%)",
-    "lesson": "嘗試新策略: VolumeOnly_PinBar"
-  },
-  {
-    "id": "ThreeWhiteSoldiers_v1",
-    "name": "ThreeWhiteSoldiers_v1",
-    "problem": "未達標 (WR=22.3%, PF=1.42, DD=135.3%)",
-    "lesson": "嘗試新策略: VolumeOnly_ThreeWhiteSoldiers"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "WickRatio_v1",
-    "name": "WickRatio_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.42, DD=132.9%)",
-    "lesson": "嘗試新策略: VolumeOnly_WickRatio"
-  },
-  {
-    "id": "MultiTF_Daily4H_Confirm_v1",
-    "name": "MultiTF_Daily4H_Confirm_v1",
-    "problem": "未達標 (WR=22.5%, PF=1.40, DD=133.8%)",
-    "lesson": "嘗試新策略: MultiTF_Daily4H"
-  },
-  {
-    "id": "MondayPump_v1",
-    "name": "MondayPump_v1",
-    "problem": "未達標 (WR=21.2%, PF=1.43, DD=104.4%)",
-    "lesson": "嘗試新策略: MondayEffect"
-  },
-  {
-    "id": "VolumeSpike_v1",
-    "name": "VolumeSpike_v1",
-    "problem": "未達標 (WR=22.4%, PF=1.49, DD=116.8%)",
-    "lesson": "嘗試新策略: VolumeOnly_VolumeSpike"
-  },
-  {
-    "id": "MultiTF_4H1H_Confirm_v1",
-    "name": "MultiTF_4H1H_Confirm_v1",
-    "problem": "未達標 (WR=22.0%, PF=1.39, DD=135.3%)",
-    "lesson": "嘗試新策略: MultiTF_4H1H"
+    "round": 1,
+    "entry_conditions": "snap.rsi < 39 and snap.vol_ratio > 1.2 and snap.trend_7d > 2.8",
+    "avoid_patterns": [
+      "snap.rsi < 39"
+    ],
+    "wr": 0.0,
+    "pf": 0.0,
+    "reason": "wr=0.0% < 50%"
+  },
+  {
+    "round": 2,
+    "entry_conditions": "snap.rsi < 44 and snap.vol_ratio > 1.7 and snap.trend_7d > 1.8",
+    "avoid_patterns": [
+      "snap.rsi < 44"
+    ],
+    "wr": 0.0,
+    "pf": 0.0,
+    "reason": "wr=0.0% < 50%"
+  },
+  {
+    "round": 3,
+    "entry_conditions": "snap.rsi < 35 and snap.vol_ratio > 1.5 and snap.trend_7d > 0.4",
+    "avoid_patterns": [
+      "snap.rsi < 35"
+    ],
+    "wr": 0.0,
+    "pf": 0.0,
+    "reason": "wr=0.0% < 50%"
+  },
+  {
+    "round": 1,
+    "strategy": "MomentumStrategy",
+    "params": {
+      "lookback": 5,
+      "momentum_thresh": 0.036798277945119744,
+      "vol_ratio": 1.0030768423687368
+    },
+    "metrics": {
+      "wr": 51.61290322580645,
+      "pf": 1.2250109598707344,
+      "dd": 9.24570511795676,
+      "sharpe": 2.1640861963884843
+    },
+    "reason": "wr=51.6% pf=1.23 dd=9.2 sharpe=2.16"
+  },
+  {
+    "round": 3,
+    "strategy": "MABreakoutStrategy",
+    "params": {
+      "ma_period": 30,
+      "price_thresh": 0.04132411242381213,
+      "vol_thresh": 1.548477869785891
+    },
+    "metrics": {
+      "wr": 60.16949152542372,
+      "pf": 1.5428730079864277,
+      "dd": 5.335011498976985,
+      "sharpe": 2.8995116588688163
+    },
+    "reason": "wr=60.2% pf=1.54 dd=5.3 sharpe=2.90"
+  },
+  {
+    "round": 1,
+    "strategy": "RSIReversalStrategy",
+    "params": {
+      "rsi_period": 7,
+      "rsi_oversold": 30,
+      "vol_thresh": 1.3235975795032615
+    },
+    "metrics": {
+      "wr": 60.86956521739131,
+      "pf": 0.8750724362870277,
+      "dd": 21.429400812827783,
+      "sharpe": -0.6196751035955795
+    },
+    "reason": "wr=60.9% pf=0.88 dd=21.4 sharpe=-0.62"
+  },
+  {
+    "round": 2,
+    "strategy": "MABreakoutStrategy",
+    "params": {
+      "ma_period": 20,
+      "price_thresh": 0.035152703225608414,
+      "vol_thresh": 1.9104071656611228
+    },
+    "metrics": {
+      "wr": 61.53846153846154,
+      "pf": 1.8403977678146841,
+      "dd": 3.3965351188301276,
+      "sharpe": 2.5065042035306937
+    },
+    "reason": "wr=61.5% pf=1.84 dd=3.4 sharpe=2.51"
   }
 ]

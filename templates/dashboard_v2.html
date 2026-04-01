@@ -371,6 +371,9 @@
         .loading::after { content: '...'; animation: blink 1s infinite; }
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
+        /* ── Market Toggle ── */
+        .market-toggle { display: flex; gap: 2px; background: var(--bg-tertiary); border-radius: 6px; padding: 2px; }
+
         /* ── Market Sentiment ── */
         .sentiment-bar { display: flex; gap: var(--space-sm); margin-bottom: var(--space-lg); flex-wrap: wrap; }
         .sentiment-chip { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; transition: all 0.2s; }
@@ -490,23 +493,54 @@
 
             <!-- Chart -->
             <div class="section">
-                <div class="section-title">比特幣 K 線</div>
+                <div class="section-title" id="chart-section-title">比特幣 K 線</div>
                 <div class="chart-wrap">
                     <div class="chart-header">
-                        <div>
-                            <div class="chart-sym" id="chart-sym">BTC/USDT</div>
-                            <div class="chart-price" id="chart-price">—</div>
-                            <div class="chart-meta" id="chart-meta">
-                                <span>Vol: —</span>
-                                <span id="chart-change">—</span>
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                            <!-- Market type toggle -->
+                            <div class="market-toggle">
+                                <button class="tf-btn active" id="btn-crypto" onclick="switchMarket('CRYPTO')">🪙 Crypto</button>
+                                <button class="tf-btn" id="btn-twse" onclick="switchMarket('TWSE')">🏦 台股</button>
+                            </div>
+                            <!-- Crypto symbol -->
+                            <div id="crypto-selector" style="display:flex;align-items:center;gap:6px">
+                                <span class="chart-sym" id="chart-sym">BTC/USDT</span>
+                            </div>
+                            <!-- TWSE stock selector + search -->
+                            <div id="twse-controls" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
+                                <select id="twse-stock-select" onchange="onTWSEStockChange(this.value)" style="background:var(--bg-tertiary);border:1px solid var(--border-color);color:var(--text-primary);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--font-mono)">
+                                    <option value="2330">2330 台積電</option>
+                                    <option value="2317">2317 鴻海</option>
+                                    <option value="2454">2454 聯發科</option>
+                                    <option value="2891">2891 中信金</option>
+                                    <option value="2884">2884 玉山金</option>
+                                    <option value="2885">2885 元大金</option>
+                                    <option value="2618">2618 東畸</option>
+                                </select>
+                                <div style="position:relative">
+                                    <input id="twse-search-input" type="text" placeholder="搜尋股票..." onkeyup="onTWSESearchKeyup(event)" style="background:var(--bg-tertiary);border:1px solid var(--border-color);color:var(--text-primary);border-radius:6px;padding:3px 8px;font-size:11px;width:120px;font-family:var(--font-mono)">
+                                    <div id="twse-search-results" style="display:none;position:absolute;top:100%;left:0;z-index:200;background:var(--bg-card);border:1px solid var(--border-color);border-radius:6px;min-width:180px;max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.4);margin-top:4px"></div>
+                                </div>
+                            </div>
+                            <div id="twse-quote-display" style="display:none;font-size:12px">
+                                <span class="chart-price" id="twse-price">—</span>
+                                <span id="twse-change" style="font-size:11px;margin-left:6px;font-family:var(--font-mono)">—</span>
+                                <span id="twse-volume" style="font-size:10px;color:var(--text-muted);margin-left:6px"></span>
                             </div>
                         </div>
-                        <div class="chart-tf">
-                            <button class="tf-btn" data-tf="15m">15m</button>
-                            <button class="tf-btn active" data-tf="4h">4H</button>
-                            <button class="tf-btn" data-tf="1d">1D</button>
+                        <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+                            <div class="chart-tf" id="crypto-tf-buttons">
+                                <button class="tf-btn" data-tf="15m">15m</button>
+                                <button class="tf-btn active" data-tf="4h">4H</button>
+                                <button class="tf-btn" data-tf="1d">1D</button>
+                            </div>
+                            <div class="chart-tf" id="twse-tf-buttons" style="display:none">
+                                <button class="tf-btn active" data-tf="D">日</button>
+                                <button class="tf-btn" data-tf="W">週</button>
+                                <button class="tf-btn" data-tf="M">月</button>
+                            </div>
+                            <button id="clear-chart-lines-btn" onclick="clearPriceLines()" style="margin-left:8px;font-size:10px;padding:4px 10px;border-radius:6px;border:1px solid var(--border-color);background:transparent;color:var(--text-muted);cursor:pointer;display:none">🗑 清除疊加線</button>
                         </div>
-                        <button id="clear-chart-lines-btn" onclick="clearPriceLines()" style="margin-left:8px;font-size:10px;padding:4px 10px;border-radius:6px;border:1px solid var(--border-color);background:transparent;color:var(--text-muted);cursor:pointer;display:none">🗑 清除疊加線</button>
                     </div>
                     <div id="chart-container"></div>
                 </div>
@@ -572,6 +606,9 @@
 var API_BASE = '/api';
 var currentTF = '4h';
 var currentSym = 'BTC';
+var currentMarket = 'CRYPTO';  // 'CRYPTO' or 'TWSE'
+var currentTWSEStock = '2330';
+var _twseSearchTimer = null;
 var chart = null;
 var candleSeries = null;
 var lastSuccessfulUpdate = null;
@@ -622,6 +659,104 @@ function setChip(id, val, type) {
     el.className = 'sentiment-chip ' + type;
     var v = document.getElementById(id + '-val');
     if (v) v.textContent = val;
+}
+
+// ── TWSE / Market Switching ──
+function switchMarket(market) {
+    currentMarket = market;
+    document.getElementById('btn-crypto').classList.toggle('active', market === 'CRYPTO');
+    document.getElementById('btn-twse').classList.toggle('active', market === 'TWSE');
+    document.getElementById('crypto-selector').style.display = market === 'CRYPTO' ? 'flex' : 'none';
+    document.getElementById('twse-controls').style.display = market === 'TWSE' ? 'flex' : 'none';
+    document.getElementById('twse-quote-display').style.display = market === 'TWSE' ? 'inline' : 'none';
+    document.getElementById('crypto-tf-buttons').style.display = market === 'CRYPTO' ? 'flex' : 'none';
+    document.getElementById('twse-tf-buttons').style.display = market === 'TWSE' ? 'flex' : 'none';
+    document.getElementById('twse-search-results').style.display = 'none';
+    if (market === 'TWSE') {
+        var twseTf = 'D';
+        document.querySelectorAll('#twse-tf-buttons .tf-btn').forEach(function(b) {
+            b.classList.toggle('active', b.dataset.tf === twseTf);
+        });
+        loadTWSEQuote(currentTWSEStock);
+        loadChartData(currentTWSEStock, twseTf);
+    } else {
+        document.querySelectorAll('#crypto-tf-buttons .tf-btn').forEach(function(b) {
+            b.classList.toggle('active', b.dataset.tf === currentTF);
+        });
+        loadChartData(currentSym, currentTF);
+    }
+}
+
+function loadTWSEQuote(stockCode) {
+    fetch(API_BASE + '/twse/quote/' + stockCode)
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function(data) {
+            if (data.error) return;
+            var priceEl = document.getElementById('twse-price');
+            var changeEl = document.getElementById('twse-change');
+            var volEl = document.getElementById('twse-volume');
+            priceEl.textContent = fmtPrice(data.price);
+            priceEl.className = 'chart-price ' + (data.change_pct >= 0 ? 'up' : 'dn');
+            changeEl.textContent = (data.change_pct >= 0 ? '+' : '') + data.change_pct.toFixed(2) + '%';
+            changeEl.className = data.change_pct >= 0 ? 'up' : 'dn';
+            volEl.textContent = 'Vol: ' + fmtNum(data.volume);
+        })
+        .catch(function() {});
+}
+
+function onTWSEStockChange(code) {
+    currentTWSEStock = code;
+    var twseTf = 'D';
+    document.querySelectorAll('#twse-tf-buttons .tf-btn').forEach(function(b) {
+        if (b.classList.contains('active')) twseTf = b.dataset.tf;
+    });
+    loadTWSEQuote(code);
+    loadChartData(code, twseTf);
+}
+
+function onTWSESearchKeyup(e) {
+    var q = e.target.value.trim();
+    clearTimeout(_twseSearchTimer);
+    if (q.length < 1) {
+        document.getElementById('twse-search-results').style.display = 'none';
+        return;
+    }
+    _twseSearchTimer = setTimeout(function() {
+        fetch(API_BASE + '/twse/search?q=' + encodeURIComponent(q))
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
+            .then(function(data) {
+                var container = document.getElementById('twse-search-results');
+                if (!data.results || !data.results.length) {
+                    container.innerHTML = '<div style="padding:8px 12px;font-size:11px;color:var(--text-muted)">無結果</div>';
+                    container.style.display = 'block';
+                    return;
+                }
+                container.innerHTML = data.results.map(function(s) {
+                    return '<div onclick="selectTWSEResult(\'' + s.code + '\', \'' + s.name + '\')" style="padding:7px 12px;cursor:pointer;font-size:11px;display:flex;justify-content:space-between;align-items:center;font-family:var(--font-mono);transition:background 0.1s">' +
+                        '<span style="font-weight:700;color:var(--accent-blue)">' + s.code + '</span>' +
+                        '<span style="color:var(--text-secondary)">' + s.name + '</span></div>';
+                }).join('');
+                container.style.display = 'block';
+            })
+            .catch(function() {});
+    }, 300);
+}
+
+function selectTWSEResult(code, name) {
+    document.getElementById('twse-search-input').value = code + ' ' + name;
+    document.getElementById('twse-search-results').style.display = 'none';
+    var sel = document.getElementById('twse-stock-select');
+    var exists = false;
+    for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === code) { exists = true; break; }
+    }
+    if (!exists) {
+        var opt = document.createElement('option');
+        opt.value = code;
+        opt.textContent = code + ' ' + name;
+        sel.insertBefore(opt, sel.firstChild);
+    }
+    onTWSEStockChange(code);
 }
 
 function renderMarketSentiment(ind) {
@@ -1052,9 +1187,13 @@ function initChart() {
 function loadChartData(sym, tf) {
     sym = sym || currentSym;
     tf = tf || currentTF;
-    // API expects symbol without USDT (e.g. "BTC", not "BTCUSDT")
-    var cleanSym = sym.toUpperCase().replace('USDT', '');
-    fetch(API_BASE + '/klines?symbol=' + cleanSym + '&interval=' + tf + '&limit=300')
+
+    var isTWSE = (currentMarket === 'TWSE');
+    var url = isTWSE
+        ? API_BASE + '/twse/klines/' + sym + '?interval=' + tf + '&limit=300'
+        : API_BASE + '/klines?symbol=' + sym.toUpperCase().replace('USDT', '') + '&interval=' + tf + '&limit=300';
+
+    fetch(url)
         .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
         .then(function(data) {
             if (!data || !data.length) return;
@@ -1069,13 +1208,29 @@ function loadChartData(sym, tf) {
             });
             if (candleSeries) candleSeries.setData(cdata);
             chart.timeScale().fitContent();
-            document.getElementById('chart-sym').textContent = sym + '/USDT';
+
+            if (isTWSE) {
+                // Show TWSE stock code as symbol
+                var sel = document.getElementById('twse-stock-select');
+                var stockName = sym;
+                if (sel) {
+                    for (var i = 0; i < sel.options.length; i++) {
+                        if (sel.options[i].value === sym) {
+                            stockName = sel.options[i].textContent;
+                            break;
+                        }
+                    }
+                }
+                document.getElementById('chart-sym').textContent = stockName;
+            } else {
+                document.getElementById('chart-sym').textContent = sym + '/USDT';
+            }
+
             var last = cdata[cdata.length - 1];
             if (last) {
                 var priceEl = document.getElementById('chart-price');
                 priceEl.textContent = fmtPrice(last.close);
                 priceEl.className = 'chart-price';
-                // Change color based on last close vs open
                 if (cdata.length > 1) {
                     var prev = cdata[cdata.length - 2];
                     if (prev) {
@@ -1177,13 +1332,23 @@ document.addEventListener('DOMContentLoaded', function() {
         else { startCountdown(); }
     });
 
-    // TF buttons
-    document.querySelectorAll('.tf-btn[data-tf]').forEach(function(btn) {
+    // Crypto TF buttons
+    document.querySelectorAll('#crypto-tf-buttons .tf-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
-            document.querySelectorAll('.tf-btn[data-tf]').forEach(function(b){ b.classList.remove('active'); });
+            document.querySelectorAll('#crypto-tf-buttons .tf-btn').forEach(function(b){ b.classList.remove('active'); });
             btn.classList.add('active');
             currentTF = btn.dataset.tf;
-            loadChartData('BTC', currentTF);
+            loadChartData(currentSym, currentTF);
+        });
+    });
+
+    // TWSE TF buttons
+    document.querySelectorAll('#twse-tf-buttons .tf-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('#twse-tf-buttons .tf-btn').forEach(function(b){ b.classList.remove('active'); });
+            btn.classList.add('active');
+            var twseTf = btn.dataset.tf;
+            loadTWSEChart(currentTWSEStock, twseTf);
         });
     });
 

@@ -1,0 +1,12 @@
+{
+  "strategy": "VolBreakoutStrategy",
+  "researcher_wr": 64.5,
+  "qa_wr": 59.25925925925925,
+  "qa_pf": 1.7407164196138845,
+  "qa_dd": 3.6130301949245083,
+  "qa_sharpe": 3.300809854590311,
+  "qa_trades": 108,
+  "wr_error_pct": 5.240740740740748,
+  "status": "FAIL",
+  "verified_at": "2026-04-01T15:55:23.500258"
+}

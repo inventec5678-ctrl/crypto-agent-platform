@@ -1,0 +1,8 @@
+commit	val_bpb	memory_gb	status	description
+rsi_oversold_recovery_v1	66.666667	0.0	keep	RSI Oversold Recovery LONG: rsi<35 bounce+vol>1.5x, hold until rsi>65 or <MA200
+bb_momentum_breakout_v1	57.142857	0.0	keep	BB Momentum Breakout LONG: price breaks BB upper+vol>1.5x+rsi>55, hold until <MA204feac25	51.6129	1.2250	9.25	2.1641	discard	round1: MomentumStrategy {'lookback': 5, 'momentum_thresh': 0.036798277945119744, 'vol_ratio': 1.0030768423687368}
+ae6fba2	64.4860	2.1067	3.48	4.5137	keep	round2: VolBreakoutStrategy {'vol_period': 10, 'vol_mult': 1.5034993830409715, 'price_filter': 0.023401861731887054}
+df79ea1	60.1695	1.5429	5.34	2.8995	discard	round3: MABreakoutStrategy {'ma_period': 30, 'price_thresh': 0.04132411242381213, 'vol_thresh': 1.548477869785891}
+4022b72	60.8696	0.8751	21.43	-0.6197	discard	rsi_reversal: rsi_period=7, rsi_oversold=30, vol_thresh=1.3235975795032615, TP=5%, SL=2%
+b8dd0dd	61.5385	1.8404	3.40	2.5065	discard	ma_breakout: ma_period=20, price_thresh=0.035152703225608414, vol_thresh=1.9104071656611228, TP=5%, SL=2%
+13c00d4	63.0137	2.1514	2.72	3.6978	keep	vol_breakout: vol_ratio>1.6604010098739508(vol_period=10), price_change>0.01636035207956837, TP=5%, SL=2%

@@ -338,8 +338,8 @@ class StrategyBacktester:
         trades = []
         position = None
         
-        # 從 2 年前開始（留足夠 lookback）
-        start_bar = min(730, len(self.market.df) - 1000)  # 確保有足夠歷史
+        # 從 MA200 準備好之後開始（足夠 lookback），跑全部 K 線
+        start_bar = 250  # warmup for MA200
         
         for i in range(start_bar, len(self.market.df)):
             snapshot = self.market.get_snapshot(i)
@@ -446,7 +446,13 @@ class StrategyBacktester:
 
 
 # ========== AI 策略生成器 ==========
-class AIStrategyGenerator:
+# DEPRECATED: 此類已被 loop.py 的 team-researcher sub-agent 取代
+# 策略生成現由 ResearchOrchestrator.dispatch_researcher()
+# 透過 OpenClaw sessions_spawn 派給 team-researcher sub-agent
+# 如需啟用，請改回原來的骨架實作
+AIStrategyGenerator = None  # type: ignore
+
+class _DeprecatedAIStrategyGenerator:
     """AI 策略生成器"""
     
     def __init__(self, market_data: MarketData, failure_memory: FailureMemory):

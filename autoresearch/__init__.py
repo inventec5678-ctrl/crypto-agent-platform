@@ -28,7 +28,6 @@ from .experiment_strategies import (
 )
 from .persistence import Persistence
 from .experiment_engine import ExperimentEngine, BacktestStrategyWrapper
-from .loop import AutoresearchLoop, LoopConfig
 from .registry import ALL_SPECS, get_specs, get_default_params
 from .market_regime import MarketRegimeClassifier
 from .factor_library import FactorLibrary, FactorRecord
@@ -45,8 +44,6 @@ __all__ = [
     "Persistence",
     "ExperimentEngine",
     "BacktestStrategyWrapper",
-    "AutoresearchLoop",
-    "LoopConfig",
     "ALL_SPECS",
     "get_specs",
     "get_default_params",

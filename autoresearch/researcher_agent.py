@@ -1,245 +1,474 @@
 """
-researcher_agent.py — Karpathy AutoResearch 模式的自主研究 Agent
+researcher_agent.py — Raw OHLCV 自主研究
 
-每次循環：
-1. 分析市場數據
-2. 想一個新策略
-3. 寫入 experiment_strategy.py
-4. 跑 backtest_engine.py
-5. 根據結果記錄到 results.tsv
-6. 繼續下一輪
+研究 Agent 只能看到：
+- open, high, low, close, volume
+
+研究 Agent 自己：
+- 構造任何指標
+- 定義進場/出場邏輯
+- 用 BacktestEngine 跑回測
+- 把結果寫入 results.tsv
+
+廢除了：
+- MarketSnapshot 類（不再使用）
+- ai_researcher.py 的 StrategyBacktester.backtest(entry_fn) 模式
+- 所有 pre-computed 指標
 """
 
 import sys
-import json
-import random
-import re
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent.absolute()
+sys.path.insert(0, str(PROJECT_ROOT))
+
+import pandas as pd
+import numpy as np
+from pathlib import Path
+from datetime import datetime
+import random
+import json
+
+from backtest.backtest_engine import BacktestEngine, BaseStrategy, PositionSide
+
 DATA_PATH = PROJECT_ROOT / "data" / "btcusdt_1d.parquet"
-AUTORESEARCH_DIR = PROJECT_ROOT / "autoresearch"
-MEMORY_DIR = AUTORESEARCH_DIR / "memory"
-EXPERIMENT_STRATEGY = AUTORESEARCH_DIR / "experiment_strategy.py"
+MEMORY_DIR = PROJECT_ROOT / "autoresearch" / "memory"
 RESULTS_TSV = MEMORY_DIR / "results.tsv"
 FAILED_JSON = MEMORY_DIR / "failed_strategies.json"
 RESEARCH_LOG = MEMORY_DIR / "research_log.md"
 
-
-def load_market_snapshot():
-    """載入市場快照"""
-    import pandas as pd
-    from autoresearch.ai_researcher import MarketData
-
-    df = pd.read_parquet(str(DATA_PATH))
-    md = MarketData(df)
-    snap = md.get_snapshot(len(df) - 1)
-
-    return {
-        "regime": str(snap.regime),
-        "rsi_14": float(snap.rsi),
-        "atr": float(snap.atr),
-        "ma200_slope": float(snap.ma200_slope),
-        "trend_7d": float(snap.trend_7d),
-        "vol_ratio": float(snap.vol_ratio),
-        "close": float(snap.close),
-        "ma10": float(snap.ma10),
-        "ma20": float(snap.ma20),
-        "ma50": float(snap.ma50),
-        "ma200": float(snap.ma200),
-    }
+# 確保目錄存在
+MEMORY_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def load_failed_strategies():
-    if FAILED_JSON.exists():
-        return json.loads(FAILED_JSON.read_text())
-    return []
+# ========== 目標門檻 ==========
+WIN_RATE_THRESH = 50.0
+PROFIT_FACTOR_THRESH = 2.0
+MAX_DD_THRESH = 30.0
+SHARPE_THRESH = 1.5
 
 
-def save_failed_strategy(strategy):
-    """記錄失敗策略"""
-    failed = load_failed_strategies()
-    failed.append(strategy)
-    FAILED_JSON.write_text(json.dumps(failed, indent=2, ensure_ascii=False))
+def _init_results_tsv():
+    """初始化 results.tsv"""
+    if not RESULTS_TSV.exists():
+        RESULTS_TSV.write_text("commit\twin_rate\tprofit_factor\tmax_dd\tsharpe\tstatus\tdescription\n")
 
 
-def write_strategy_to_file(code: str):
-    """寫入 experiment_strategy.py"""
-    EXPERIMENT_STRATEGY.write_text(code)
-
-
-def run_backtest():
-    """跑 backtest，返回結果"""
-    sys.path.insert(0, str(PROJECT_ROOT))
-    from autoresearch.ai_researcher import StrategyBacktester, MarketData
-    import pandas as pd
-
-    # 讀取 experiment_strategy.py 的內容
-    code = EXPERIMENT_STRATEGY.read_text()
-
-    # 解析策略參數
-    rsi_match = re.search(r'rsi\s*<\s*(\d+)', code)
-    vol_match = re.search(r'vol_ratio\s*>\s*([\d.]+)', code)
-    trend_match = re.search(r'trend_7d\s*>\s*([-\d.]+)', code)
-    sl_match = re.search(r'STOP_LOSS\s*=\s*([\d.]+)', code)
-    tp_match = re.search(r'TAKE_PROFIT\s*=\s*([\d.]+)', code)
-    hold_match = re.search(r'MAX_HOLDING_BARS\s*=\s*(\d+)', code)
-
-    # 構造 entry_conditions 字串
-    conditions = []
-    if rsi_match:
-        conditions.append(f"snap.rsi < {rsi_match.group(1)}")
-    if vol_match:
-        conditions.append(f"snap.vol_ratio > {vol_match.group(1)}")
-    if trend_match:
-        conditions.append(f"snap.trend_7d > {trend_match.group(1)}")
-
-    entry_conditions = " and ".join(conditions) if conditions else "snap.rsi < 50"
-
-    entry_fn = eval(f"lambda snap: {entry_conditions}")
-
-    df = pd.read_parquet(str(DATA_PATH))
-    md = MarketData(df)
-    backtester = StrategyBacktester(md)
-
-    result = backtester.backtest(
-        strategy_id=f"exp_{len(load_failed_strategies())+1}",
-        strategy_name="Experiment",
-        entry_description=entry_conditions,
-        entry_fn=entry_fn,
-        stop_loss_pct=float(sl_match.group(1)) if sl_match else 0.02,
-        take_profit_pct=float(tp_match.group(1)) if tp_match else 0.05,
-        max_holding_bars=int(hold_match.group(1)) if hold_match else 10,
-    )
-
-    return {
-        "win_rate": result.win_rate,
-        "profit_factor": result.profit_factor,
-        "max_drawdown": result.max_drawdown,
-        "sharpe": result.sharpe,
-        "total_trades": result.total_trades,
-        "wins": result.wins,
-        "losses": result.losses,
-    }
-
-
-def record_result(strategy_id: str, wr: float, pf: float, dd: float, sharpe: float, status: str, description: str):
+def _record_result(commit: str, wr: float, pf: float, dd: float, sharpe: float, status: str, desc: str):
     """寫入 results.tsv"""
-    import hashlib
-    commit = hashlib.md5(strategy_id.encode()).hexdigest()[:7]
-
-    line = f"{commit}\t{wr:.6f}\t{0.0:.1f}\t{status}\t{description}\n"
-
-    if RESULTS_TSV.exists():
-        content = RESULTS_TSV.read_text()
-        if not content.strip():
-            content = "commit\tval_bpb\tmemory_gb\tstatus\tdescription\n"
-    else:
-        content = "commit\tval_bpb\tmemory_gb\tstatus\tdescription\n"
-
+    _init_results_tsv()
+    content = RESULTS_TSV.read_text()
+    line = f"{commit}\t{wr:.4f}\t{pf:.4f}\t{dd:.2f}\t{sharpe:.4f}\t{status}\t{desc}\n"
     RESULTS_TSV.write_text(content + line)
 
 
+def _load_failed():
+    """載入失敗策略"""
+    if FAILED_JSON.exists():
+        try:
+            return json.loads(FAILED_JSON.read_text())
+        except:
+            return []
+    return []
+
+
+def _save_failed(failed_list):
+    """保存失敗策略"""
+    FAILED_JSON.write_text(json.dumps(failed_list, indent=2, ensure_ascii=False))
+
+
+def _build_desc(strategy: BaseStrategy) -> str:
+    """從 strategy 物件建立精確描述"""
+    p = strategy.__dict__
+    name = strategy.__class__.__name__
+    if name == "VolBreakoutStrategy":
+        return (f"vol_breakout: vol_ratio>{p['vol_mult']}(vol_period={p['vol_period']}), "
+                f"price_change>{p['price_filter']}, TP=5%, SL=2%")
+    elif name == "MABreakoutStrategy":
+        return (f"ma_breakout: ma_period={p['ma_period']}, price_thresh={p['price_thresh']}, "
+                f"vol_thresh={p['vol_thresh']}, TP=5%, SL=2%")
+    elif name == "RSIReversalStrategy":
+        return (f"rsi_reversal: rsi_period={p['rsi_period']}, rsi_oversold={p['rsi_oversold']}, "
+                f"vol_thresh={p['vol_thresh']}, TP=5%, SL=2%")
+    elif name == "MomentumStrategy":
+        return (f"momentum: lookback={p['lookback']}, momentum_thresh={p['momentum_thresh']}, "
+                f"vol_ratio={p['vol_ratio']}, TP=5%, SL=2%")
+    return f"{name}: {p}"
+
+
+def _get_entry_logic(strategy: BaseStrategy) -> str:
+    """從 strategy 類別提取進場條件描述"""
+    name = strategy.__class__.__name__
+    p = strategy.__dict__
+    if name == "VolBreakoutStrategy":
+        return (f"- vol_ratio = volumes[-1] / (sum(volumes[-{p['vol_period']}:]) / {p['vol_period']})\n"
+                f"- vol_ratio > {p['vol_mult']}\n"
+                f"- price_change = (closes[-1] - closes[-{p['vol_period']}]) / closes[-{p['vol_period']}]\n"
+                f"- price_change > {p['price_filter']}")
+    elif name == "MABreakoutStrategy":
+        return (f"- ma = mean(closes[-{p['ma_period']}:])\n"
+                f"- price_change = (closes[-1] - closes[-{p['ma_period']}]) / closes[-{p['ma_period']}]\n"
+                f"- closes[-1] > ma\n"
+                f"- price_change > {p['price_thresh']}\n"
+                f"- vol_ratio > {p['vol_thresh']}")
+    elif name == "RSIReversalStrategy":
+        return (f"- rsi(period={p['rsi_period']}) < {p['rsi_oversold']}\n"
+                f"- vol_ratio > {p['vol_thresh']}")
+    elif name == "MomentumStrategy":
+        return (f"- momentum = (closes[-1] - closes[-{p['lookback']}]) / closes[-{p['lookback']}]\n"
+                f"- momentum > {p['momentum_thresh']}\n"
+                f"- vol_ratio > {p['vol_ratio']}")
+    return "See Python code"
+
+
+def _get_exit_logic(strategy: BaseStrategy) -> str:
+    """從 strategy 類別提取出场條件描述"""
+    return "- SL = 2%\n- TP = 5%\n- 最大持倉 = 10 根 K 線"
+
+
+def write_strategy_spec(strategy_name: str, strategy_class_code: str, params: dict,
+                        entry_logic: str, exit_logic: str, backtest_result):
+    """寫入策略規格書到 research_log.md"""
+    spec = f"""
+## Strategy Spec: {strategy_name}
+
+**Generated at**: {datetime.now().isoformat()}
+
+### 進場條件
+{entry_logic}
+
+### 出場條件
+{exit_logic}
+
+### 參數
+{json.dumps(params, indent=2)}
+
+### Python 代碼
+```python
+{strategy_class_code}
+```
+
+### Backtest 結果
+- Win Rate: {backtest_result.Win_Rate:.1f}%
+- Profit Factor: {backtest_result.Profit_Factor:.2f}
+- Max Drawdown: {backtest_result.Max_Drawdown_Pct:.1f}%
+- Sharpe Ratio: {backtest_result.Sharpe_Ratio:.2f}
+- Total Trades: {backtest_result.Total_Trades}
+
+---
+"""
+    RESEARCH_LOG.write_text(RESEARCH_LOG.read_text() + spec)
+
+
+def _generate_commit_id(strategy_desc: str) -> str:
+    """生成簡短的 commit ID"""
+    import hashlib
+    return hashlib.md5(strategy_desc.encode()).hexdigest()[:7]
+
+
+# ========== 研究 Agent 示範策略工廠 ==========
+# 這些是 Agent 自己"想到"的策略（實際上是隨機組合）
+# 研究 Agent 應該自己想出有意義的策略，這裡只是示範
+
+class StrategyFactory:
+    """策略工廠 — 示範如何自己發明策略"""
+
+    @staticmethod
+    def random_strategy(round_num: int) -> BaseStrategy:
+        """
+        隨機生成一個策略（這裡是示範）
+        實際上 Agent 應該自己想出有意義的策略邏輯
+        """
+        # 隨機選擇策略類型
+        strategy_type = random.choice(["ma_breakout", "rsi_reversal", "vol_breakout", "momentum"])
+
+        if strategy_type == "ma_breakout":
+            return MABreakoutStrategy(
+                ma_period=random.choice([10, 20, 30]),
+                price_thresh=random.uniform(0.01, 0.05),
+                vol_thresh=random.uniform(1.2, 2.0)
+            )
+        elif strategy_type == "rsi_reversal":
+            return RSIReversalStrategy(
+                rsi_period=random.choice([7, 14, 21]),
+                rsi_oversold=random.choice([25, 30, 35]),
+                vol_thresh=random.uniform(1.0, 1.5)
+            )
+        elif strategy_type == "vol_breakout":
+            return VolBreakoutStrategy(
+                vol_period=random.choice([10, 20]),
+                vol_mult=random.uniform(1.5, 2.5),
+                price_filter=random.uniform(0.01, 0.03)
+            )
+        else:  # momentum
+            return MomentumStrategy(
+                lookback=random.choice([5, 10, 20]),
+                momentum_thresh=random.uniform(0.02, 0.05),
+                vol_ratio=random.uniform(1.0, 1.5)
+            )
+
+    @staticmethod
+    def get_strategy_description(strategy: BaseStrategy) -> str:
+        """取得策略描述"""
+        return strategy.__class__.__name__
+
+
+# ========== 策略範例（Agent 自己發明的策略）============
+
+class MABreakoutStrategy(BaseStrategy):
+    """
+    均線突破策略
+    Agent 邏輯：價格站上均線 + 成交量放大 = 做多
+    """
+    def __init__(self, ma_period: int = 20, price_thresh: float = 0.03, vol_thresh: float = 1.5):
+        self.ma_period = ma_period
+        self.price_thresh = price_thresh  # 價格變化閾值
+        self.vol_thresh = vol_thresh        # 成交量倍數閾值
+
+    def generate_signal(self, market_data):
+        df = market_data["BTCUSDT"]
+        closes = df['close'].values
+        volumes = df['volume'].values
+
+        if len(closes) < self.ma_period + 2:
+            return PositionSide.FLAT
+
+        # Agent 自己計算指標
+        ma = np.mean(closes[-self.ma_period:])
+        vol_avg = np.mean(volumes[-self.ma_period:])
+        price_change = (closes[-1] - closes[-self.ma_period]) / closes[-self.ma_period]
+        vol_ratio = volumes[-1] / vol_avg if vol_avg > 0 else 1.0
+
+        # Agent 自己定義進場邏輯
+        if closes[-1] > ma and price_change > self.price_thresh and vol_ratio > self.vol_thresh:
+            return PositionSide.LONG
+
+        return PositionSide.FLAT
+
+
+class RSIReversalStrategy(BaseStrategy):
+    """
+    RSI 反轉策略
+    Agent 邏輯：RSI 超賣 + 成交量放大 = 做多
+    """
+    def __init__(self, rsi_period: int = 14, rsi_oversold: float = 30.0, vol_thresh: float = 1.2):
+        self.rsi_period = rsi_period
+        self.rsi_oversold = rsi_oversold
+        self.vol_thresh = vol_thresh
+
+    def _compute_rsi(self, prices: np.ndarray, period: int) -> float:
+        """自己計算 RSI"""
+        if len(prices) < period + 1:
+            return 50.0
+        deltas = np.diff(prices[-period-1:])
+        gains = np.where(deltas > 0, deltas, 0)
+        losses = np.where(deltas < 0, -deltas, 0)
+        avg_gain = np.mean(gains)
+        avg_loss = np.mean(losses)
+        if avg_loss == 0:
+            return 100.0
+        rs = avg_gain / avg_loss
+        return 100 - (100 / (1 + rs))
+
+    def generate_signal(self, market_data):
+        df = market_data["BTCUSDT"]
+        closes = df['close'].values
+        volumes = df['volume'].values
+
+        if len(closes) < self.rsi_period + 2:
+            return PositionSide.FLAT
+
+        # Agent 自己計算 RSI
+        rsi = self._compute_rsi(closes, self.rsi_period)
+
+        # 自己計算成交量比率
+        vol_avg = np.mean(volumes[-20:])
+        vol_ratio = volumes[-1] / vol_avg if vol_avg > 0 else 1.0
+
+        # Agent 自己定義進場：RSI 超賣 + 成交量放大
+        if rsi < self.rsi_oversold and vol_ratio > self.vol_thresh:
+            return PositionSide.LONG
+
+        return PositionSide.FLAT
+
+
+class VolBreakoutStrategy(BaseStrategy):
+    """
+    成交量突破策略
+    Agent 邏輯：成交量突破均線 + 價格上漲 = 做多
+    """
+    def __init__(self, vol_period: int = 20, vol_mult: float = 2.0, price_filter: float = 0.02):
+        self.vol_period = vol_period
+        self.vol_mult = vol_mult
+        self.price_filter = price_filter
+
+    def generate_signal(self, market_data):
+        df = market_data["BTCUSDT"]
+        closes = df['close'].values
+        volumes = df['volume'].values
+
+        if len(closes) < self.vol_period + 2:
+            return PositionSide.FLAT
+
+        # Agent 自己計算
+        vol_avg = np.mean(volumes[-self.vol_period:])
+        vol_now = volumes[-1]
+
+        # 價格變化
+        price_change = (closes[-1] - closes[-self.vol_period]) / closes[-self.vol_period]
+
+        # Agent 自己定義進場：成交量突破 + 價格上漲
+        if vol_now > vol_avg * self.vol_mult and price_change > self.price_filter:
+            return PositionSide.LONG
+
+        return PositionSide.FLAT
+
+
+class MomentumStrategy(BaseStrategy):
+    """
+    動量策略
+    Agent 邏輯：短期動量強勁 + 成交量確認 = 做多
+    """
+    def __init__(self, lookback: int = 10, momentum_thresh: float = 0.03, vol_ratio: float = 1.2):
+        self.lookback = lookback
+        self.momentum_thresh = momentum_thresh
+        self.vol_ratio = vol_ratio
+
+    def generate_signal(self, market_data):
+        df = market_data["BTCUSDT"]
+        closes = df['close'].values
+        volumes = df['volume'].values
+
+        if len(closes) < self.lookback + 2:
+            return PositionSide.FLAT
+
+        # Agent 自己計算動量
+        momentum = (closes[-1] - closes[-self.lookback]) / closes[-self.lookback]
+
+        # 成交量確認
+        vol_avg = np.mean(volumes[-self.lookback:])
+        vol_ratio = volumes[-1] / vol_avg if vol_avg > 0 else 1.0
+
+        # Agent 自己定義進場：動量強勁 + 成交量確認
+        if momentum > self.momentum_thresh and vol_ratio > self.vol_ratio:
+            return PositionSide.LONG
+
+        return PositionSide.FLAT
+
+
+# ========== 研究迴圈 ==========
+
 def run_research_loop(rounds: int = 3):
-    """執行 research 循環"""
-    snapshot = load_market_snapshot()
-    failed = load_failed_strategies()
+    """
+    研究循環（Karpathy AutoResearch 模式）
+
+    每輪：
+    1. 讀 raw OHLCV（只有 open, high, low, close, volume）
+    2. Agent 自己發明策略
+    3. 跑 BacktestEngine
+    4. 記錄到 results.tsv
+    """
+    # 讀 raw OHLCV
+    df = pd.read_parquet(str(DATA_PATH))
+
+    # 只把 raw OHLCV 傳給 Agent（不經過任何預處理）
+    market_data = {"BTCUSDT": df}
 
     print(f"\n{'='*60}")
-    print(f"  team-researcher 啟動")
-    print(f"  Market: {snapshot['regime']} | RSI={snapshot['rsi_14']:.1f} | Close={snapshot['close']}")
-    print(f"  測試輪數: {rounds}")
+    print(f"  研究 Agent 啟動（Raw OHLCV Only）")
+    print(f"  數據: {len(df)} bars")
+    print(f"  Columns: {list(df.columns)}")
+    print(f"  目標: WR≥{WIN_RATE_THRESH}% | PF≥{PROFIT_FACTOR_THRESH} | DD≤{MAX_DD_THRESH}% | Sharpe≥{SHARPE_THRESH}")
     print(f"{'='*60}")
 
-    # 失敗過的關鍵詞組合（用於避開）
-    avoid_keywords = set()
-    for f in failed:
-        avoid_keywords.update(f.get("avoid_patterns", []))
+    failed = _load_failed()
 
     for round_num in range(1, rounds + 1):
-        print(f"\n--- Round {round_num}/{rounds} ---")
+        print(f"\n--- Round {round_num} ---")
 
-        # === 根據 snapshot 和 avoid_keywords 想一個新策略 ===
-        # regime-aware 隨機策略生成
-        regime = snapshot["regime"]
+        # ========== Agent 自己想到的策略 ==========
+        # 這裡隨機選擇一個策略類型作為示範
+        # 實際上 Agent 應該自己想出有意義的策略
 
-        if regime in ("BULL", "STRONG_BULL"):
-            direction = "LONG"
-            rsi_thresh = random.randint(30, 45)
-            vol_thresh = random.uniform(1.2, 1.8)
-            trend_thresh = random.uniform(0, 3)
-        elif regime in ("BEAR", "STRONG_BEAR"):
-            direction = random.choice(["LONG", "SHORT"])
-            rsi_thresh = random.randint(55, 70) if direction == "SHORT" else random.randint(30, 45)
-            vol_thresh = random.uniform(1.2, 1.8)
-            trend_thresh = random.uniform(-3, 0) if direction == "SHORT" else random.uniform(0, 3)
-        else:
-            direction = "LONG"
-            rsi_thresh = random.randint(30, 70)
-            vol_thresh = random.uniform(0.8, 1.5)
-            trend_thresh = 0
+        strategy = StrategyFactory.random_strategy(round_num)
+        strategy_name = StrategyFactory.get_strategy_description(strategy)
 
-        tp = random.uniform(0.06, 0.12)
-        sl = random.uniform(0.015, 0.03)
-        max_hold = random.randint(5, 20)
+        print(f"  策略: {strategy_name}")
+        print(f"  參數: {strategy.__dict__}")
 
-        entry_code = f"snap.rsi < {rsi_thresh} and snap.vol_ratio > {vol_thresh:.1f} and snap.trend_7d > {trend_thresh:.1f}"
+        # ========== 用 BacktestEngine 跑回測 ==========
+        engine = BacktestEngine()
 
-        strategy_code = f'''
-"""
-experiment_strategy.py — Round {round_num}
-Market: {snapshot['regime']} | RSI={snapshot['rsi_14']:.1f}
-"""
-from dataclasses import dataclass
+        # 封裝非同步
+        import asyncio
+        async def run_backtest():
+            engine.load_dataframe("BTCUSDT", df)
+            engine.set_strategy(strategy)
+            engine.stop_loss = 0.02
+            engine.take_profit = 0.05
+            return await engine.run()
 
-def get_entry(snap) -> bool:
-    return ({entry_code})
+        result = asyncio.run(run_backtest())
 
-STOP_LOSS = {sl:.4f}
-TAKE_PROFIT = {tp:.4f}
-MAX_HOLDING_BARS = {max_hold}
-DIRECTION = "{direction}"
-'''
+        # 提取結果
+        wr = result.Win_Rate
+        pf = result.Profit_Factor
+        dd = result.Max_Drawdown_Pct
+        sharpe = result.Sharpe_Ratio
+        trades = result.Total_Trades
 
-        print(f"  策略: {entry_code}")
-        print(f"  TP={tp:.2%} SL={sl:.2%} HOLD={max_hold}")
+        print(f"  WR={wr:.1f}% PF={pf:.2f} DD={dd:.1f}% Sharpe={sharpe:.2f} Trades={trades}")
 
-        # 寫入策略文件
-        write_strategy_to_file(strategy_code)
-
-        # 跑 backtest
-        print(f"  執行回測...")
-        result = run_backtest()
-
-        wr = result["win_rate"]
-        pf = result["profit_factor"]
-        dd = result["max_drawdown"]
-        sharpe = result["sharpe"]
-
-        print(f"  結果: WR={wr:.1f}% PF={pf:.2f} DD={dd:.1f}% Sharpe={sharpe:.2f}")
-
-        # 評估
-        all_pass = (wr >= 50 and pf >= 2.0 and dd <= 30 and sharpe >= 1.5)
+        # ========== 評估決策 ==========
+        all_pass = (wr >= WIN_RATE_THRESH and pf >= PROFIT_FACTOR_THRESH
+                    and dd <= MAX_DD_THRESH and sharpe >= SHARPE_THRESH)
         status = "keep" if all_pass else "discard"
 
-        print(f"  裁決: {status.upper()}")
+        print(f"  Decision: {status.upper()}")
 
-        # 記錄
-        desc = f"round{round_num}: {entry_code[:50]}... TP={tp:.2%} SL={sl:.2%}"
-        record_result(f"round_{round_num}", wr, pf, dd, sharpe, status, desc)
+        # 描述（精確參數）
+        desc = _build_desc(strategy)
 
+        # ========== 寫入 Strategy Spec 到 research_log.md ==========
+        import inspect
+        strategy_code = inspect.getsource(strategy.__class__)
+        params = strategy.__dict__
+        write_strategy_spec(
+            strategy_name=strategy_name,
+            strategy_class_code=strategy_code,
+            params=params,
+            entry_logic=_get_entry_logic(strategy),
+            exit_logic=_get_exit_logic(strategy),
+            backtest_result=result
+        )
+
+        # ========== 寫入 results.tsv ==========
+        commit_id = _generate_commit_id(desc)
+        _record_result(commit_id, wr, pf, dd, sharpe, status, desc)
+
+        # ========== 如果失敗，記錄到 failed_strategies ==========
         if status == "discard":
-            save_failed_strategy({
+            failed.append({
                 "round": round_num,
-                "entry_conditions": entry_code,
-                "avoid_patterns": [entry_code.split(" and ")[0].strip()],
-                "wr": wr,
-                "pf": pf,
-                "reason": f"wr={wr:.1f}% < 50%" if wr < 50 else f"pf={pf:.2f} < 2.0"
+                "strategy": strategy_name,
+                "params": strategy.__dict__,
+                "metrics": {"wr": wr, "pf": pf, "dd": dd, "sharpe": sharpe},
+                "reason": f"wr={wr:.1f}% pf={pf:.2f} dd={dd:.1f} sharpe={sharpe:.2f}"
             })
+            _save_failed(failed)
 
-    print(f"\n✅ {rounds} 輪研究完成")
-    print(f"📄 results.tsv 已更新")
+        # 關閉引擎
+        engine.close()
+
+    print(f"\n{'='*60}")
+    print(f"✅ {rounds} 輪研究完成")
+    print(f"📄 results.tsv: {RESULTS_TSV}")
+    print(f"   總策略數: {rounds}")
+
+    # 顯示 results.tsv 內容
+    if RESULTS_TSV.exists():
+        print(f"\n📊 results.tsv 內容:")
+        print(RESULTS_TSV.read_text())
 
 
 if __name__ == "__main__":

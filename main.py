@@ -1,5 +1,7 @@
 """FastAPI 主程式"""
 import asyncio
+import datetime as _dt_module
+import httpx
 import json
 import logging
 import os
@@ -475,17 +477,6 @@ def find_trigger_candle(strategy: dict, daily: list, h4: list, preferred_directi
 
 def _compute_entry_tp_sl(strategy: dict, ind: dict, entry_price: float, direction: str = "LONG") -> dict:
     """計算進場價、止盈價、止損價"""
-    result = {
-        "entry_price": round(entry_price, 2),
-        "stop_loss": None,
-        "take_profit": None,
-        "sl_pct": None,
-        "tp_pct": None,
-        "tp_sl_ratio": None,
-        "risk_reward": None,
-        "tp_note": None,
-    }
-
     result = {
         "entry_price": round(entry_price, 2),
         "stop_loss": None,
@@ -1628,8 +1619,13 @@ async def get_large_orders(symbol: str = None, limit: int = 50):
     critical = [o for o in orders if o.get("severity") == "critical"]
     warnings = [o for o in orders if o.get("severity") == "warning"]
 
-
-    return {"alerts": [], "count": 0, "timestamp": datetime.now().isoformat(), "error": str(e)}
+    return {
+        "alerts": orders,
+        "critical": critical,
+        "warnings": warnings,
+        "count": len(orders),
+        "timestamp": datetime.now().isoformat(),
+    }
 
 
 @app.get("/api/events")
@@ -1927,6 +1923,169 @@ async def autoresearch_report():
 #     """取得所有 20 幣種的多因子信號"""
 #     return {"signals": [], "count": 0, "timestamp": datetime.now().isoformat()}
 
+
+# ─── TWSE API ──────────────────────────────────────────────────────────────
+
+TWSE_BASE = "https://openapi.twse.com.tw"
+
+async def _twse_get(path: str, params: dict = None) -> dict:
+    """Call TWSE Open API with proper headers"""
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0",
+    }
+    url = f"{TWSE_BASE}{path}"
+    async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
+        r = await client.get(url, params=params, headers=headers)
+        r.raise_for_status()
+        return r.json()
+
+def _twse_to_klines(rows: list) -> list:
+    """Convert TWSE daily rows to klines format. TWSE row: [date, open, high, low, close, volume]"""
+    result = []
+    for row in rows:
+        date_str = str(row[0])  # e.g. "2026/03/31"
+        parts = date_str.split("/")
+        year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
+        dt = _dt_module.datetime(year, month, day)
+        ts = int(dt.timestamp())
+        result.append({
+            "time": ts,
+            "open": float(row[1]),
+            "high": float(row[2]),
+            "low": float(row[3]),
+            "close": float(row[4]),
+            "volume": float(row[5]),
+        })
+    return result
+
+
+@app.get("/api/twse/quote/{stock_code}")
+async def get_twse_quote(stock_code: str):
+    """
+    即時報價：GET /api/twse/quote/2330
+    TWSE endpoint: /v1/exchangeReport/STOCK_DAY_ALL (all stocks daily snapshot)
+    """
+    try:
+        data = await _twse_get("/v1/exchangeReport/STOCK_DAY_ALL")
+        for item in data:
+            if item.get("Code") == stock_code:
+                date_str = item.get("Date", "")
+                # ROC date: 1150331 -> 2026-03-31
+                if len(date_str) == 7:
+                    roc_year = int(date_str[:3])
+                    year = roc_year + 1911
+                    month = int(date_str[3:5])
+                    day = int(date_str[5:7])
+                    dt = _dt_module.datetime(year, month, day)
+                    date_formatted = dt.strftime("%Y-%m-%d")
+                else:
+                    date_formatted = date_str
+                closing = float(item.get("ClosingPrice", 0))
+                change = float(item.get("Change", 0))
+                prev_close = closing - change if closing and change else None
+                chg_pct = (change / prev_close * 100) if prev_close and prev_close != 0 else 0.0
+                return {
+                    "code": stock_code,
+                    "name": item.get("Name", stock_code),
+                    "price": closing,
+                    "opening_price": float(item.get("OpeningPrice", 0)),
+                    "high_price": float(item.get("HighestPrice", 0)),
+                    "low_price": float(item.get("LowestPrice", 0)),
+                    "change": round(change, 2),
+                    "change_pct": round(chg_pct, 2),
+                    "volume": int(item.get("TradeVolume", 0)),
+                    "trade_value": int(item.get("TradeValue", 0)),
+                    "transaction": int(item.get("Transaction", 0)),
+                    "date": date_formatted,
+                }
+        return {"error": f"Stock {stock_code} not found"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"TWSE quote error: {e}")
+        return {"error": str(e)}
+
+
+_twse_search_cache = {"data": {}, "time": 0}
+
+@app.get("/api/twse/search")
+async def search_twse(q: str):
+    """
+    搜尋股票：GET /api/twse/search?q=台積
+    """
+    global _twse_search_cache
+    import time as _time
+    now = _time.time()
+    if now - _twse_search_cache["time"] > 600:
+        try:
+            # STOCK_DAY_ALL returns a JSON list of objects: [{Code, Name, ...}, ...]
+            data = await _twse_get("/v1/exchangeReport/STOCK_DAY_ALL")
+            if isinstance(data, list):
+                _twse_search_cache["data"] = {
+                    str(item.get("Code", "")): str(item.get("Name", ""))
+                    for item in data
+                }
+            else:
+                _twse_search_cache["data"] = {}
+            _twse_search_cache["time"] = now
+        except Exception:
+            _twse_search_cache["data"] = {}
+            _twse_search_cache["time"] = now
+    q_upper = q.upper()
+    results = [
+        {"code": code, "name": name}
+        for code, name in _twse_search_cache["data"].items()
+        if q_upper in code or q_upper in name.upper()
+    ]
+    return {"results": results[:20]}
+
+
+@app.get("/api/twse/klines/{stock_code}")
+async def get_twse_klines(stock_code: str, interval: str = "D", limit: int = 300):
+    """
+    K線歷史：GET /api/twse/klines/2330?interval=D&limit=300
+    TWSE 即日資料: /v1/exchangeReport/STOCK_DAY_ALL
+    回傳今日 OHLCV 資料（格式相容 lightweight-charts）
+    """
+    try:
+        data = await _twse_get("/v1/exchangeReport/STOCK_DAY_ALL")
+        candles = []
+        for item in data:
+            if item.get("Code") != stock_code:
+                continue
+            date_str = item.get("Date", "")
+            # ROC date: 1150331 = Year 115 (ROC) = 2026, March 31
+            if len(date_str) == 7:
+                roc_year = int(date_str[:3])
+                year = roc_year + 1911
+                month = int(date_str[3:5])
+                day = int(date_str[5:7])
+                dt = _dt_module.datetime(year, month, day)
+                ts_ms = int(dt.timestamp())
+            else:
+                ts_ms = int(_dt_module.datetime.now().timestamp() * 1000)
+
+            candles.append({
+                "time": ts_ms,
+                "open": float(item.get("OpeningPrice", 0)),
+                "high": float(item.get("HighestPrice", 0)),
+                "low": float(item.get("LowestPrice", 0)),
+                "close": float(item.get("ClosingPrice", 0)),
+                "volume": float(item.get("TradeVolume", 0)),
+            })
+        if not candles:
+            raise HTTPException(status_code=404, detail=f"Stock {stock_code} not found")
+        # 依 time 排序
+        candles.sort(key=lambda x: x["time"])
+        return candles[-limit:]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"TWSE klines error: {e}")
+        raise HTTPException(status_code=502, detail=f"TWSE API error: {e}")
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=5006)
