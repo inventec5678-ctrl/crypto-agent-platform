@@ -1390,33 +1390,36 @@ function _renderModalConditions(s) {
 }
 
 function _doRenderModal(s) {
-    var body = document.getElementById('modal-body');
-    var html = _renderModalMetrics(s) + _renderModalPrices(s);
+    console.log('[DEBUG] _doRenderModal called for:', s.name, 'direction:', s.direction);
 
-    // Strategy parameters
-    var params = s.parameters || {};
-    if (Object.keys(params).length > 0) {
-        var paramsHtml = '<div class="modal-section">';
-        paramsHtml += '<div class="modal-section-title">策略參數</div>';
-        paramsHtml += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">';
-        for (var key in params) {
-            paramsHtml += '<div style="background:rgba(50,50,50,0.3);padding:6px 8px;border-radius:4px;font-size:12px">';
-            paramsHtml += '<span style="color:#8B949E">' + key + ':</span> ';
-            paramsHtml += '<span style="color:#fff;font-weight:600">' + params[key] + '</span>';
-            paramsHtml += '</div>';
-        }
-        paramsHtml += '</div></div>';
-        html += paramsHtml;
+    // 測試：直接強制開 Modal
+    var modal = document.getElementById('strategy-modal');
+    if (modal) {
+        modal.classList.add('open');
+    }
+    var title = document.getElementById('modal-title');
+    if (title) {
+        title.textContent = s.name || '策略詳情';
+    }
+    var body = document.getElementById('modal-body');
+    if (body) {
+        body.innerHTML = '<div style="padding:20px;background:#1C2128;border-radius:8px;margin:16px"><h3 style="color:#58A6FF;margin-bottom:12px">策略概覽</h3><p><b>勝率：</b>' + (s.win_rate||0).toFixed(1) + '%</p><p><b>盈虧比：</b>' + (s.profit_factor||0).toFixed(2) + '</p><p><b>最大回撤：</b>' + (s.max_drawdown||0).toFixed(1) + '%</p><p><b>Sharpe：</b>' + (s.sharpe||0).toFixed(2) + '</p><p><b>方向：</b>' + (s.direction||'neutral') + '</p><p><b>進場價：</b>' + (s.entry_price||'—') + '</p></div>';
     }
 
-    html += _renderModalConditions(s);
-    body.innerHTML = html;
+    // 如果有 entry_conditions，顯示
+    if (body && (s.entry_conditions || s.conditions)) {
+        var conds = s.entry_conditions || s.conditions;
+        var ec = Array.isArray(conds) ? conds : [conds];
+        var ecHtml = '<div style="margin:16px"><h4 style="color:#8B949E;margin-bottom:8px">進場條件</h4>';
+        ec.forEach(function(c) {
+            ecHtml += '<div style="padding:6px 8px;background:#21262D;margin-bottom:4px;border-radius:4px;color:#E6EDF3;font-size:12px">⚪ ' + c + '</div>';
+        });
+        ecHtml += '</div>';
+        body.innerHTML += ecHtml;
+    }
 
-    window._activeModalStrategy = s;
     window._currentStrategy = s;
-    clearPriceLines();
-    document.getElementById('modal-title').textContent = s.name || '策略詳情';
-    document.getElementById('strategy-modal').classList.add('open');
+    window._activeModalStrategy = s;
 }
 
 function openStrategyModalById(id) {
