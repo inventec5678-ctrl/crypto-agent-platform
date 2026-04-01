@@ -506,6 +506,7 @@
                             <button class="tf-btn active" data-tf="4h">4H</button>
                             <button class="tf-btn" data-tf="1d">1D</button>
                         </div>
+                        <button id="clear-chart-lines-btn" onclick="clearPriceLines()" style="margin-left:8px;font-size:10px;padding:4px 10px;border-radius:6px;border:1px solid var(--border-color);background:transparent;color:var(--text-muted);cursor:pointer;display:none">🗑 清除疊加線</button>
                     </div>
                     <div id="chart-container"></div>
                 </div>
@@ -882,7 +883,7 @@ function openStrategyModal(idx) {
 
 function closeStrategyModal() {
     document.getElementById('strategy-modal').classList.remove('open');
-    clearPriceLines();
+    // Lines persist on chart after modal closes — use "清除" button to remove
 }
 
 // ── Anomaly Panels ──
@@ -1106,6 +1107,13 @@ function copyPrice(btn, val) {
     }).catch(function() {});
 }
 
+function updateChartLineButtons() {
+    var hasLines = false;
+    Object.keys(_activePriceLines).forEach(function(k) { if (_activePriceLines[k]) hasLines = true; });
+    var btn = document.getElementById('clear-chart-lines-btn');
+    if (btn) btn.style.display = hasLines ? 'inline-flex' : 'none';
+}
+
 function togglePriceLine(type) {
     if (!candleSeries) return;
     var strat = window._activeModalStrategy;
@@ -1118,11 +1126,13 @@ function togglePriceLine(type) {
         candleSeries.removePriceLine(_activePriceLines[type]);
         _activePriceLines[type] = null;
         document.querySelectorAll('.modal-chart-btn').forEach(function(b) { if (b.textContent.includes(label)) b.classList.remove('active'); });
+        updateChartLineButtons();
         return;
     }
     var line = candleSeries.createPriceLine({ price: price, color: color, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: label });
     _activePriceLines[type] = line;
     document.querySelectorAll('.modal-chart-btn').forEach(function(b) { if (b.textContent.includes(label)) b.classList.add('active'); });
+    updateChartLineButtons();
 }
 
 function clearPriceLines() {
@@ -1131,6 +1141,7 @@ function clearPriceLines() {
         if (_activePriceLines[k]) { candleSeries.removePriceLine(_activePriceLines[k]); _activePriceLines[k] = null; }
     });
     document.querySelectorAll('.modal-chart-btn').forEach(function(b) { b.classList.remove('active'); });
+    updateChartLineButtons();
 }
 
 document.addEventListener('DOMContentLoaded', function() {
