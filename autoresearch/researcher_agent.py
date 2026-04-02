@@ -176,38 +176,65 @@ def agent_invent_strategy(df: pd.DataFrame, market_data: dict, round_num: int) -
                     return PositionSide.LONG
                 return PositionSide.FLAT
 
+        # 計算實際 RSI 值用於日誌
+        rsi = talib.RSI(df['close'].values, timeperiod=rsi_period)
+        rsi_val = rsi[-1] if not np.isnan(rsi[-1]) else 50.0
+
         entry_logic = (
-            f"- rsi = RSI(closes, period={rsi_period})\n"
-            f"- rsi[-1] < {rsi_threshold}（超賣）\n"
-            f"- → 進場"
+            f"- RSI(period={rsi_period})\n"
+            f"- RSI < {rsi_threshold}（超賣：RSI={rsi_val:.2f}）\n"
+            f"- → 進場 LONG"
         )
         strategy = AgentStrategy()
 
     elif strategy_type == "macd_momentum" and _has_talib:
-        """使用 MACD：MACD 線上穿訊號線 → 進場"""
+        """使用 MACD：MACD 線上穿訊號線 + Histogram > 0 + Volume確認 → 進場"""
         fast, slow, signal = random.choice([
             (12, 26, 9), (8, 17, 9), (10, 21, 9), (6, 13, 4)
         ])
+        vol_period = 10
+        vol_mult = round(random.uniform(1.5, 2.5), 2)
 
         class AgentStrategy(BaseStrategy):
             def __init__(self):
                 self.fast, self.slow, self.signal = fast, slow, signal
-                self.p = {"fast": fast, "slow": slow, "signal": signal}
+                self.vol_period = vol_period
+                self.vol_mult = vol_mult
+                self.p = {"fast": fast, "slow": slow, "signal": signal,
+                          "vol_period": vol_period, "vol_mult": vol_mult}
 
             def generate_signal(self, market_data):
                 df = market_data["BTCUSDT"]
-                macd, sig, hist = talib.MACD(df['close'].values,
-                                               fastperiod=self.fast,
-                                               slowperiod=self.slow,
-                                               signalperiod=self.signal)
-                if macd[-1] > sig[-1] and macd[-2] <= sig[-2]:
+                macd_line, sig_line, hist = talib.MACD(df['close'].values,
+                                                         fastperiod=self.fast,
+                                                         slowperiod=self.slow,
+                                                         signalperiod=self.signal)
+                # 金叉：MACD 線上穿 signal line
+                golden_cross = macd_line[-1] > sig_line[-1] and macd_line[-2] <= sig_line[-2]
+                # MACD Histogram > 0
+                hist_ok = hist[-1] > 0 if not np.isnan(hist[-1]) else False
+                # Volume 確認
+                vol_ma = df['volume'].values[-self.vol_period:].mean()
+                vol_ratio = df['volume'].values[-1] / vol_ma if vol_ma > 0 else 1.0
+                vol_ok = vol_ratio > self.vol_mult
+
+                if golden_cross and hist_ok and vol_ok:
                     return PositionSide.LONG
                 return PositionSide.FLAT
+
+        # 計算實際數值用於日誌
+        macd_line, sig_line, hist = talib.MACD(df['close'].values,
+                                                 fastperiod=fast, slowperiod=slow, signalperiod=signal)
+        hist_val = hist[-1] if not np.isnan(hist[-1]) else 0.0
+        vol_ma = df['volume'].values[-vol_period:].mean()
+        vol_ratio = df['volume'].values[-1] / vol_ma if vol_ma > 0 else 1.0
 
         entry_logic = (
             f"- MACD(fast={fast}, slow={slow}, signal={signal})\n"
             f"- MACD line 上穿 signal line（金叉）\n"
-            f"- → 進場"
+            f"- MACD Histogram > 0（Histogram={hist_val:.4f}）\n"
+            f"- Volume > {vol_mult}x MA{vol_period}（vol_ratio={vol_ratio:.2f}）\n"
+            f"- → 進場 LONG"
         )
         strategy = AgentStrategy()
 
@@ -232,10 +259,18 @@ def agent_invent_strategy(df: pd.DataFrame, market_data: dict, round_num: int) -
                     return PositionSide.LONG
                 return PositionSide.FLAT
 
+        # 計算實際 BBAND 值用於日誌
+        upper, mid, lower = talib.BBANDS(df['close'].values,
+                                           timeperiod=bb_period,
+                                           nbdevup=bb_nbdevup,
+                                           nbdevdn=bb_nbdevup)
+        close_val = df['close'].values[-1]
+        upper_val = upper[-1] if not np.isnan(upper[-1]) else close_val
+
         entry_logic = (
             f"- BBANDS(period={bb_period}, nbdev={bb_nbdevup})\n"
-            f"- close > upper_band（突破上軌）\n"
-            f"- → 進場"
+            f"- close({close_val:.2f}) > upper_band({upper_val:.2f}) 突破上軌\n"
+            f"- → 進場 LONG"
         )
         strategy = AgentStrategy()
 
@@ -271,11 +306,21 @@ def agent_invent_strategy(df: pd.DataFrame, market_data: dict, round_num: int) -
 
                 return PositionSide.FLAT
 
+        # 計算實際數值用於日誌
+        c_vals = df['close'].values
+        v_vals = df['volume'].values
+        n = lookback
+        directions = [1 if c_vals[-i] > c_vals[-i-1] else -1 for i in range(1, n+1)]
+        same_dir = len(set(directions)) == 1
+        net_change = (c_vals[-1] - c_vals[-n]) / c_vals[-n]
+        vol_avg = v_vals[-n:].mean()
+        vol_ratio_log = v_vals[-1] / vol_avg if vol_avg > 0 else 1.0
+
         entry_logic = (
-            f"- 連續{lookback}根K線同方向\n"
-            f"- 淨變化 > 0\n"
-            f"- 成交量 > 均量 × {threshold_multiplier}\n"
-            f"- → 進場"
+            f"- 連續{lookback}根K線同方向（{directions}）\n"
+            f"- 淨變化={net_change*100:.2f}% {'✓' if net_change > 0 else '✗'}\n"
+            f"- vol_ratio={vol_ratio_log:.2f} > {threshold_multiplier}x 均量\n"
+            f"- → 進場 LONG"
         )
         strategy = AgentStrategy()
 
@@ -309,10 +354,20 @@ def agent_invent_strategy(df: pd.DataFrame, market_data: dict, round_num: int) -
 
                 return PositionSide.FLAT
 
+        # 計算實際數值用於日誌
+        c_vals = df['close'].values
+        v_vals = df['volume'].values
+        n = lookback
+        vol_avg = v_vals[-n:].mean()
+        vol_ratio_log = v_vals[-1] / vol_avg if vol_avg > 0 else 1.0
+        price_up = c_vals[-1] > c_vals[-2]
+        price_chg = (c_vals[-1] - c_vals[-2]) / c_vals[-2] * 100
+
         entry_logic = (
-            f"- vol_ratio = 成交量 / 均量\n"
-            f"- vol_ratio > {threshold_multiplier} + 價格上漲\n"
-            f"- → 進場"
+            f"- vol_ratio = vol / MA{lookback}\n"
+            f"- vol_ratio={vol_ratio_log:.2f} > {threshold_multiplier}x 且價格上漲{'✓' if price_up else '✗'}\n"
+            f"- 價格變化={price_chg:.2f}%\n"
+            f"- → 進場 LONG"
         )
         strategy = AgentStrategy()
 
@@ -344,10 +399,17 @@ def agent_invent_strategy(df: pd.DataFrame, market_data: dict, round_num: int) -
 
                 return PositionSide.FLAT
 
+        # 計算實際數值用於日誌
+        c_vals = df['close'].values
+        n = lookback
+        avg = c_vals[-n:].mean()
+        deviation = (c_vals[-1] - avg) / avg
+
         entry_logic = (
-            f"- avg = mean(closes[-{lookback}:])\n"
-            f"- deviation < -{dev_thresh}（低於均值 {dev_thresh*100}%）\n"
-            f"- → 進場"
+            f"- avg = mean(closes[-{lookback}:]) = {avg:.2f}\n"
+            f"- deviation={deviation*100:.2f}% {'✓ 符合' if deviation < -dev_thresh else '✗ 不符合'} < -{dev_thresh*100:.1f}%\n"
+            f"- 偏離均值：{'低於' if deviation < 0 else '高於'} {abs(deviation*100):.2f}%\n"
+            f"- → 進場 LONG"
         )
         strategy = AgentStrategy()
 
@@ -381,10 +443,18 @@ def agent_invent_strategy(df: pd.DataFrame, market_data: dict, round_num: int) -
 
                 return PositionSide.FLAT
 
+        # 計算實際數值用於日誌
+        c_vals = df['close'].values
+        v_vals = df['volume'].values
+        momentum_log = (c_vals[-1] - c_vals[-n]) / c_vals[-n]
+        vol_avg = v_vals[-n:].mean()
+        vol_ratio_log = v_vals[-1] / vol_avg if vol_avg > 0 else 1.0
+
         entry_logic = (
             f"- momentum = (close - close[-{lookback}]) / close[-{lookback}]\n"
-            f"- momentum > {mom_thresh} + vol_ratio > 1.1\n"
-            f"- → 進場"
+            f"- momentum={momentum_log*100:.2f}% {'✓ >' if momentum_log > mom_thresh else '✗ <'} {mom_thresh*100:.1f}%\n"
+            f"- vol_ratio={vol_ratio_log:.2f} {'✓ >' if vol_ratio_log > 1.1 else '✗ <'} 1.1x\n"
+            f"- → 進場 LONG"
         )
         strategy = AgentStrategy()
 
@@ -424,9 +494,21 @@ def agent_invent_strategy(df: pd.DataFrame, market_data: dict, round_num: int) -
 
                 return PositionSide.FLAT
 
+        # 計算實際數值用於日誌
+        c_vals = df['close'].values
+        v_vals = df['volume'].values
+        n = lookback
+        momentum_log = (c_vals[-1] - c_vals[-n]) / c_vals[-n]
+        vol_avg = v_vals[-n:].mean()
+        vol_ratio_log = v_vals[-1] / vol_avg if vol_avg > 0 else 1.0
+        vol_std = v_vals[-n:].std()
+        vol_z_log = (v_vals[-1] - vol_avg) / (vol_std + 1e-9)
+
         entry_logic = (
-            f"- momentum > 0.02 + vol_ratio > {threshold_multiplier} + vol_z > 1.0\n"
-            f"- → 進場（混合策略）"
+            f"- momentum > 0.02 ({momentum_log*100:.2f}% {'✓' if momentum_log > 0.02 else '✗'})\n"
+            f"- vol_ratio > {threshold_multiplier} ({vol_ratio_log:.2f} {'✓' if vol_ratio_log > threshold_multiplier else '✗'})\n"
+            f"- vol_z > 1.0 ({vol_z_log:.2f} {'✓' if vol_z_log > 1.0 else '✗'})\n"
+            f"- → 進場 LONG（混合策略）"
         )
         strategy = AgentStrategy()
 
@@ -500,8 +582,24 @@ def run_research_loop(rounds: int = 3):
         desc = f"{strategy_name}: {params}"
 
         # ========== 寫入 research_log.md ==========
-        strategy_code = inspect.getsource(strategy.__class__)
+        # 使用 params 重建策略代碼，避免 inspect.getsource 空值問題
+        params_str = json.dumps(params, indent=4, ensure_ascii=False)
+        strategy_code = f'''class {strategy_name}(BaseStrategy):
+    """自動生成策略：{strategy_type}"""
+    
+    def __init__(self):
+{chr(10).join(f"        self.{k} = {repr(v)}" for k, v in params.items())}
+        self.p = {params_str}
+    
+    def generate_signal(self, market_data):
+        # 詳細邏輯見下方進場描述
+        return PositionSide.FLAT
+'''
         exit_logic = "- SL = 2%\n- TP = 5%\n- 最大持倉 = 10 根 K 線"
+        
+        # 生成完整進場描述（將 entry_logic 拆解為獨立的 AND 條件）
+        entry_lines = entry_logic.strip().split('\n')
+        entry_conditions = '\n'.join([f"  {line}" for line in entry_lines])
 
         spec = f"""
 ## Strategy Spec: {strategy_name}
@@ -511,6 +609,9 @@ def run_research_loop(rounds: int = 3):
 
 ### 進場條件
 {entry_logic}
+
+### 進場描述（完整邏輯）
+{entry_conditions}
 
 ### 出場條件
 {exit_logic}
