@@ -1,0 +1,25 @@
+{
+  "market": "us",
+  "currency": "USD",
+  "symbols": [
+    { "symbol": "AAPL",  "name": "Apple Inc.",              "group": "tech" },
+    { "symbol": "MSFT",  "name": "Microsoft Corp.",         "group": "tech" },
+    { "symbol": "NVDA",  "name": "NVIDIA Corp.",            "group": "chip" },
+    { "symbol": "GOOGL", "name": "Alphabet Inc.",           "group": "tech" },
+    { "symbol": "AMZN",  "name": "Amazon.com Inc.",         "group": "tech" },
+    { "symbol": "META",  "name": "Meta Platforms Inc.",    "group": "tech" },
+    { "symbol": "TSLA",  "name": "Tesla Inc.",              "group": "auto" },
+    { "symbol": "AMD",   "name": "Advanced Micro Devices", "group": "chip" },
+    { "symbol": "INTC",  "name": "Intel Corp.",             "group": "chip" },
+    { "symbol": "QQQ",   "name": "Invesco QQQ Trust",       "group": "index" },
+    { "symbol": "SPY",   "name": "SPDR S&P 500 ETF",       "group": "index" },
+    { "symbol": "IWM",   "name": "iShares Russell 2000 ETF","group": "index" },
+    { "symbol": "DIA",   "name": "SPDR Dow Jones ETF",     "group": "index" },
+    { "symbol": "VTI",   "name": "Vanguard Total Stock",    "group": "index" },
+    { "symbol": "GLD",   "name": "SPDR Gold Shares",       "group": "commodity" },
+    { "symbol": "TLT",   "name": "iShares 20+ Year Treasury","group": "bond" },
+    { "symbol": "U",     "name": "Unity Software Inc.",    "group": "gaming" },
+    { "symbol": "COIN",  "name": "Coinbase Global Inc.",    "group": "crypto" },
+    { "symbol": "MSTR",  "name": "MicroStrategy Inc.",      "group": "crypto" }
+  ]
+}

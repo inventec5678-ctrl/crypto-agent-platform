@@ -1,0 +1,291 @@
+{
+  "market": "twse",
+  "currency": "TWD",
+  "symbols": [
+    {
+      "symbol": "1101",
+      "name": "台泥",
+      "group": ""
+    },
+    {
+      "symbol": "1216",
+      "name": "統一",
+      "group": ""
+    },
+    {
+      "symbol": "1301",
+      "name": "台塑",
+      "group": ""
+    },
+    {
+      "symbol": "1326",
+      "name": "台化",
+      "group": ""
+    },
+    {
+      "symbol": "1402",
+      "name": "遠東新",
+      "group": ""
+    },
+    {
+      "symbol": "1723",
+      "name": "中碳",
+      "group": ""
+    },
+    {
+      "symbol": "2002",
+      "name": "中鋼",
+      "group": ""
+    },
+    {
+      "symbol": "2108",
+      "name": "佰鴻",
+      "group": ""
+    },
+    {
+      "symbol": "2201",
+      "name": "裕隆",
+      "group": ""
+    },
+    {
+      "symbol": "2303",
+      "name": "聯電",
+      "group": ""
+    },
+    {
+      "symbol": "2308",
+      "name": "台達電",
+      "group": ""
+    },
+    {
+      "symbol": "2317",
+      "name": "鴻海",
+      "group": ""
+    },
+    {
+      "symbol": "2330",
+      "name": "台積電",
+      "group": ""
+    },
+    {
+      "symbol": "2352",
+      "name": "佳世達",
+      "group": ""
+    },
+    {
+      "symbol": "2353",
+      "name": "宏碁",
+      "group": ""
+    },
+    {
+      "symbol": "2371",
+      "name": "大同",
+      "group": ""
+    },
+    {
+      "symbol": "2376",
+      "name": "技嘉",
+      "group": ""
+    },
+    {
+      "symbol": "2382",
+      "name": "廣達",
+      "group": ""
+    },
+    {
+      "symbol": "2408",
+      "name": "友達",
+      "group": ""
+    },
+    {
+      "symbol": "2412",
+      "name": "中華電",
+      "group": ""
+    },
+    {
+      "symbol": "2451",
+      "name": "全漢",
+      "group": ""
+    },
+    {
+      "symbol": "2454",
+      "name": "聯發科",
+      "group": ""
+    },
+    {
+      "symbol": "2458",
+      "name": "義隆",
+      "group": ""
+    },
+    {
+      "symbol": "2474",
+      "name": "可成",
+      "group": ""
+    },
+    {
+      "symbol": "2478",
+      "name": "正向",
+      "group": ""
+    },
+    {
+      "symbol": "2492",
+      "name": "華新科",
+      "group": ""
+    },
+    {
+      "symbol": "2501",
+      "name": "龍巖",
+      "group": ""
+    },
+    {
+      "symbol": "2603",
+      "name": "長榮",
+      "group": ""
+    },
+    {
+      "symbol": "2609",
+      "name": "陽明",
+      "group": ""
+    },
+    {
+      "symbol": "2615",
+      "name": "萬海",
+      "group": ""
+    },
+    {
+      "symbol": "2801",
+      "name": "彰銀",
+      "group": ""
+    },
+    {
+      "symbol": "2812",
+      "name": "台中銀",
+      "group": ""
+    },
+    {
+      "symbol": "2834",
+      "name": "費城銀",
+      "group": ""
+    },
+    {
+      "symbol": "2880",
+      "name": "華南金",
+      "group": ""
+    },
+    {
+      "symbol": "2881",
+      "name": "富邦金",
+      "group": ""
+    },
+    {
+      "symbol": "2882",
+      "name": "國泰金",
+      "group": ""
+    },
+    {
+      "symbol": "2883",
+      "name": "開發金",
+      "group": ""
+    },
+    {
+      "symbol": "2884",
+      "name": "玉山金",
+      "group": ""
+    },
+    {
+      "symbol": "2885",
+      "name": "元大金",
+      "group": ""
+    },
+    {
+      "symbol": "2886",
+      "name": "台新金",
+      "group": ""
+    },
+    {
+      "symbol": "2891",
+      "name": "中信金",
+      "group": ""
+    },
+    {
+      "symbol": "2892",
+      "name": "第一金",
+      "group": ""
+    },
+    {
+      "symbol": "2912",
+      "name": "牛奶",
+      "group": ""
+    },
+    {
+      "symbol": "3008",
+      "name": "大立光",
+      "group": ""
+    },
+    {
+      "symbol": "3034",
+      "name": "聯詠",
+      "group": ""
+    },
+    {
+      "symbol": "3044",
+      "name": "記憶-KY",
+      "group": ""
+    },
+    {
+      "symbol": "3231",
+      "name": "緯創",
+      "group": ""
+    },
+    {
+      "symbol": "3443",
+      "name": "創意",
+      "group": ""
+    },
+    {
+      "symbol": "3661",
+      "name": "世芯-KY",
+      "group": ""
+    },
+    {
+      "symbol": "3702",
+      "name": "遊戲橘子",
+      "group": ""
+    },
+    {
+      "symbol": "3711",
+      "name": "日月光投控",
+      "group": ""
+    },
+    {
+      "symbol": "4904",
+      "name": "遠傳",
+      "group": ""
+    },
+    {
+      "symbol": "4938",
+      "name": "和碩",
+      "group": ""
+    },
+    {
+      "symbol": "5871",
+      "name": "中租-KY",
+      "group": ""
+    },
+    {
+      "symbol": "5876",
+      "name": "上海商銀",
+      "group": ""
+    },
+    {
+      "symbol": "5880",
+      "name": "合庫金",
+      "group": ""
+    },
+    {
+      "symbol": "6409",
+      "name": "旭隼",
+      "group": ""
+    }
+  ]
+}

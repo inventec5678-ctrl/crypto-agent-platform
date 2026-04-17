@@ -1,0 +1,16 @@
+{
+  "market": "crypto",
+  "currency": "USDT",
+  "symbols": [
+    { "symbol": "BTCUSDT", "name": "Bitcoin", "group": "major" },
+    { "symbol": "ETHUSDT", "name": "Ethereum", "group": "major" },
+    { "symbol": "SOLUSDT", "name": "Solana", "group": "alt" },
+    { "symbol": "BNBUSDT", "name": "BNB", "group": "alt" },
+    { "symbol": "XRPUSDT", "name": "XRP", "group": "alt" },
+    { "symbol": "ADAUSDT", "name": "Cardano", "group": "alt" },
+    { "symbol": "DOGEUSDT", "name": "Dogecoin", "group": "meme" },
+    { "symbol": "AVAXUSDT", "name": "Avalanche", "group": "alt" },
+    { "symbol": "DOTUSDT", "name": "Polkadot", "group": "alt" },
+    { "symbol": "LINKUSDT", "name": "Chainlink", "group": "defi" }
+  ]
+}
